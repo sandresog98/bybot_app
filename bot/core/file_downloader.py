@@ -99,6 +99,16 @@ class FileDownloader:
             elif response.status_code == 404:
                 logger.error(f"❌ Archivo no encontrado: {tipo} del proceso {proceso_id}")
                 return None
+            elif response.status_code == 500:
+                logger.error(f"❌ Error HTTP 500: Error interno del servidor")
+                try:
+                    error_data = response.json()
+                    logger.error(f"   Mensaje: {error_data.get('error', 'N/A')}")
+                    if 'debug' in error_data:
+                        logger.error(f"   Debug: {error_data['debug']}")
+                except:
+                    logger.error(f"   Respuesta: {response.text[:500]}")
+                return None
             elif response.status_code != 200:
                 logger.error(f"❌ Error HTTP {response.status_code}: {response.text[:200]}")
                 return None

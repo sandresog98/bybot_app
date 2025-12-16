@@ -153,6 +153,15 @@ class CrearCoopProcessor:
             # Descargar archivos del servidor
             temp_files = []  # Lista para limpiar archivos temporales al final
             
+            # Descargar pagaré (opcional, para referencia futura)
+            logger.info("📥 Descargando pagaré del servidor...")
+            pagare_path = self.downloader.download_file(proceso_id, 'pagare')
+            if pagare_path and os.path.exists(pagare_path):
+                temp_files.append(pagare_path)
+                logger.info("✅ Pagaré descargado correctamente")
+            else:
+                logger.warning("⚠️ No se pudo descargar el pagaré (continuando sin él)")
+            
             # Descargar estado de cuenta
             logger.info("📥 Descargando estado de cuenta del servidor...")
             estado_cuenta_path = self.downloader.download_file(proceso_id, 'estado_cuenta')
