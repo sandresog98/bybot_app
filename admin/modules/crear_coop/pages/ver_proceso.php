@@ -25,7 +25,9 @@ if (!$proceso) {
     exit();
 }
 
-$anexos = $crearCoopModel->obtenerAnexos($procesoId);
+$anexos = $crearCoopModel->obtenerAnexos($procesoId, 'anexo_original');
+$solicitudDeudor = $crearCoopModel->obtenerAnexos($procesoId, 'solicitud_vinculacion_deudor');
+$solicitudCodeudor = $crearCoopModel->obtenerAnexos($procesoId, 'solicitud_vinculacion_codeudor');
 
 // Obtener datos de IA para mostrar (validados si existen, sino originales)
 $datosIA = $crearCoopModel->obtenerDatosParaMostrar($procesoId);
@@ -293,8 +295,8 @@ function renderCampoValidacion($label, $campo, $valorOriginal, $valorValidado, $
                         </div>
                         <?php endif; ?>
                         <?php if (isset($proceso['datos_ia']['metadata'])): ?>
-                        <div class="col-md-12 col-lg-2">
-                            <small class="text-muted d-block">Tokens</small>
+                        <div class="col-md-12 col-lg-3">
+                            <small class="text-muted d-block">Tokens Análisis</small>
                             <small>
                                 <?php 
                                 $metadata = $proceso['datos_ia']['metadata'];
@@ -303,6 +305,18 @@ function renderCampoValidacion($label, $campo, $valorOriginal, $valorValidado, $
                                 echo "T: " . number_format($metadata['tokens_total'] ?? 0, 0, ',', '.');
                                 ?>
                             </small>
+                            <?php if (isset($metadata['tokens_identificacion_vinculacion'])): ?>
+                            <br>
+                            <small class="text-muted d-block mt-1">Tokens Identificación Vinculación</small>
+                            <small>
+                                <?php 
+                                $tokensVinculacion = $metadata['tokens_identificacion_vinculacion'];
+                                echo "E: " . number_format($tokensVinculacion['tokens_entrada'] ?? 0, 0, ',', '.') . " | ";
+                                echo "S: " . number_format($tokensVinculacion['tokens_salida'] ?? 0, 0, ',', '.') . " | ";
+                                echo "T: " . number_format($tokensVinculacion['tokens_total'] ?? 0, 0, ',', '.');
+                                ?>
+                            </small>
+                            <?php endif; ?>
                         </div>
                         <?php endif; ?>
                     </div>
@@ -386,6 +400,62 @@ function renderCampoValidacion($label, $campo, $valorOriginal, $valorValidado, $
                                     <?php endforeach; ?>
                                 <?php else: ?>
                                 <p class="text-muted mb-0">No hay anexos registrados para este proceso.</p>
+                                <?php endif; ?>
+                                
+                                <?php if (!empty($solicitudDeudor)): ?>
+                                    <?php foreach ($solicitudDeudor as $solicitud): ?>
+                                    <div class="mb-3 pb-2 border-top pt-3 mt-3">
+                                        <div class="d-flex align-items-center justify-content-between">
+                                            <div>
+                                                <strong class="text-success">
+                                                    <i class="fas fa-file-contract me-2"></i>Solicitud de Vinculación - Deudor
+                                                </strong>
+                                                <small class="text-muted d-block">Extraída automáticamente por IA</small>
+                                            </div>
+                                            <div>
+                                                <a href="<?php echo getBaseUrl(); ?>modules/crear_coop/api/descargar_archivo.php?proceso_id=<?php echo $procesoId; ?>&tipo=anexo&id=<?php echo $solicitud['id']; ?>&ver=1" 
+                                                   target="_blank"
+                                                   class="btn btn-sm btn-outline-info me-1" 
+                                                   title="Ver archivo">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <a href="<?php echo getBaseUrl(); ?>modules/crear_coop/api/descargar_archivo.php?proceso_id=<?php echo $procesoId; ?>&tipo=anexo&id=<?php echo $solicitud['id']; ?>" 
+                                                   class="btn btn-sm btn-outline-primary" 
+                                                   title="Descargar archivo">
+                                                    <i class="fas fa-download"></i>
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                                
+                                <?php if (!empty($solicitudCodeudor)): ?>
+                                    <?php foreach ($solicitudCodeudor as $solicitud): ?>
+                                    <div class="mb-3 pb-2">
+                                        <div class="d-flex align-items-center justify-content-between">
+                                            <div>
+                                                <strong class="text-success">
+                                                    <i class="fas fa-file-contract me-2"></i>Solicitud de Vinculación - Codeudor
+                                                </strong>
+                                                <small class="text-muted d-block">Extraída automáticamente por IA</small>
+                                            </div>
+                                            <div>
+                                                <a href="<?php echo getBaseUrl(); ?>modules/crear_coop/api/descargar_archivo.php?proceso_id=<?php echo $procesoId; ?>&tipo=anexo&id=<?php echo $solicitud['id']; ?>&ver=1" 
+                                                   target="_blank"
+                                                   class="btn btn-sm btn-outline-info me-1" 
+                                                   title="Ver archivo">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <a href="<?php echo getBaseUrl(); ?>modules/crear_coop/api/descargar_archivo.php?proceso_id=<?php echo $procesoId; ?>&tipo=anexo&id=<?php echo $solicitud['id']; ?>" 
+                                                   class="btn btn-sm btn-outline-primary" 
+                                                   title="Descargar archivo">
+                                                    <i class="fas fa-download"></i>
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <?php endforeach; ?>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -684,6 +754,62 @@ function renderCampoValidacion($label, $campo, $valorOriginal, $valorValidado, $
                         <?php endforeach; ?>
                     <?php else: ?>
                     <p class="text-muted mb-0">No hay anexos registrados para este proceso.</p>
+                    <?php endif; ?>
+                    
+                    <?php if (!empty($solicitudDeudor)): ?>
+                        <?php foreach ($solicitudDeudor as $solicitud): ?>
+                        <div class="mb-3 pb-2 border-top pt-3 mt-3">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <strong class="text-success">
+                                        <i class="fas fa-file-contract me-2"></i>Solicitud de Vinculación - Deudor
+                                    </strong>
+                                    <small class="text-muted d-block">Extraída automáticamente por IA</small>
+                                </div>
+                                <div>
+                                    <a href="<?php echo getBaseUrl(); ?>modules/crear_coop/api/descargar_archivo.php?proceso_id=<?php echo $procesoId; ?>&tipo=anexo&id=<?php echo $solicitud['id']; ?>&ver=1" 
+                                       target="_blank"
+                                       class="btn btn-sm btn-outline-info me-1" 
+                                       title="Ver archivo">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="<?php echo getBaseUrl(); ?>modules/crear_coop/api/descargar_archivo.php?proceso_id=<?php echo $procesoId; ?>&tipo=anexo&id=<?php echo $solicitud['id']; ?>" 
+                                       class="btn btn-sm btn-outline-primary" 
+                                       title="Descargar archivo">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                    
+                    <?php if (!empty($solicitudCodeudor)): ?>
+                        <?php foreach ($solicitudCodeudor as $solicitud): ?>
+                        <div class="mb-3 pb-2">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <strong class="text-success">
+                                        <i class="fas fa-file-contract me-2"></i>Solicitud de Vinculación - Codeudor
+                                    </strong>
+                                    <small class="text-muted d-block">Extraída automáticamente por IA</small>
+                                </div>
+                                <div>
+                                    <a href="<?php echo getBaseUrl(); ?>modules/crear_coop/api/descargar_archivo.php?proceso_id=<?php echo $procesoId; ?>&tipo=anexo&id=<?php echo $solicitud['id']; ?>&ver=1" 
+                                       target="_blank"
+                                       class="btn btn-sm btn-outline-info me-1" 
+                                       title="Ver archivo">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="<?php echo getBaseUrl(); ?>modules/crear_coop/api/descargar_archivo.php?proceso_id=<?php echo $procesoId; ?>&tipo=anexo&id=<?php echo $solicitud['id']; ?>" 
+                                       class="btn btn-sm btn-outline-primary" 
+                                       title="Descargar archivo">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
             </div>

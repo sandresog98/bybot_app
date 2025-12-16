@@ -265,4 +265,120 @@ IMPORTANTE - Tasa Interés Efectiva Anual (TEA):
         except Exception as e:
             logger.error(f"❌ Error analizando anexos: {e}")
             raise
+    
+    def identificar_solicitudes_vinculacion(self, pdf_paths: list) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """Identificar qué páginas contienen las solicitudes de vinculación del deudor y codeudor
+        Retorna: (resultado_identificacion, metadata_con_tokens)
+        """
+        try:
+            logger.info(f"🔍 Identificando solicitudes de vinculación en {len(pdf_paths)} anexos")
+            
+            # Cargar todos los PDFs
+            pdf_files = []
+            for pdf_path in pdf_paths:
+                pdf_file = genai.upload_file(path=pdf_path)
+                pdf_files.append(pdf_file)
+            
+            # Crear prompt para identificación con información clara sobre los archivos
+            num_archivos = len(pdf_paths)
+            prompt = f"""
+Analiza estos {num_archivos} documento(s) anexo(s) y identifica las páginas que contienen las solicitudes de vinculación.
+
+IMPORTANTE: Hay {num_archivos} archivo(s) PDF. El primer archivo tiene índice 0, el segundo tiene índice 1, etc.
+Si solo hay 1 archivo, usa archivo_index = 0 para todas las solicitudes que encuentres en ese archivo.
+
+Una solicitud de vinculación típicamente:
+- Tiene un título como "SOLICITUD DE VINCULACIÓN", "FORMULARIO DE VINCULACIÓN", "SOLICITUD DE ASOCIACIÓN"
+- Contiene datos personales del solicitante (nombres, apellidos, identificación, etc.)
+- Suele ser 2 páginas consecutivas para cada persona
+- La solicitud del DEUDOR/SOLICITANTE es la persona principal del crédito, hay un campo que suele estar marcado con una X o un Check junto a la palabra solicitante.
+- La solicitud del CODEUDOR es la persona que garantiza el crédito (puede no existir), hay un campo que suele estar marcado con una X o un Check junto a la palabra codeudor.
+
+Responde SOLO con un JSON válido en este formato:
+
+{{
+    "deudor": {{
+        "archivo_index": número del índice del archivo (0-based, donde 0 es el primer archivo, 1 es el segundo, etc.),
+        "paginas": [número_pagina_1, número_pagina_2] (números de página, 1-based, ej: [1, 2] para páginas 1 y 2)
+    }},
+    "codeudor": {{
+        "archivo_index": número del índice del archivo (0-based),
+        "paginas": [número_pagina_1, número_pagina_2]
+    }} o null si no hay codeudor
+}}
+
+INSTRUCCIONES CRÍTICAS:
+- Los números de página son 1-based (la primera página es 1, no 0)
+- archivo_index es 0-based: 0 = primer archivo, 1 = segundo archivo, etc.
+- Si solo hay 1 archivo, TODOS los archivo_index deben ser 0
+- Si no encuentras la solicitud del deudor, usa null para deudor
+- Si no hay codeudor o no encuentras su solicitud, usa null para codeudor
+- Las páginas deben ser consecutivas (ej: [3, 4] o [5, 6])
+- Responde SOLO con el JSON válido, sin texto adicional, sin explicaciones
+"""
+            
+            logger.info("📝 Prompt enviado para identificar solicitudes de vinculación")
+            
+            # Enviar a Gemini
+            response = self.model.generate_content([prompt] + pdf_files)
+            
+            # Registrar tokens utilizados
+            metadata = {}
+            if hasattr(response, 'usage_metadata'):
+                tokens_input = getattr(response.usage_metadata, 'prompt_token_count', 0)
+                tokens_output = getattr(response.usage_metadata, 'candidates_token_count', 0)
+                tokens_total = getattr(response.usage_metadata, 'total_token_count', 0)
+                metadata = {
+                    'tokens_entrada': tokens_input,
+                    'tokens_salida': tokens_output,
+                    'tokens_total': tokens_total
+                }
+                logger.info(f"🔢 Tokens utilizados (identificación) - Entrada: {tokens_input}, Salida: {tokens_output}, Total: {tokens_total}")
+            else:
+                logger.warning("⚠️ No se pudo obtener información de tokens de la respuesta")
+                metadata = {
+                    'tokens_entrada': 0,
+                    'tokens_salida': 0,
+                    'tokens_total': 0
+                }
+            
+            # Parsear respuesta JSON
+            result_text = response.text.strip()
+            # Limpiar markdown si viene envuelto
+            if result_text.startswith('```json'):
+                result_text = result_text[7:]
+            if result_text.startswith('```'):
+                result_text = result_text[3:]
+            if result_text.endswith('```'):
+                result_text = result_text[:-3]
+            result_text = result_text.strip()
+            
+            result = json.loads(result_text)
+            logger.info(f"✅ Solicitudes de vinculación identificadas: {result}")
+            
+            # Validar y corregir archivo_index si es necesario
+            if result.get('deudor') and result['deudor'].get('archivo_index') is not None:
+                archivo_index = result['deudor']['archivo_index']
+                if archivo_index >= num_archivos:
+                    logger.warning(f"⚠️ archivo_index del deudor ({archivo_index}) fuera de rango. Corrigiendo a 0")
+                    result['deudor']['archivo_index'] = 0
+            
+            if result.get('codeudor') and result['codeudor'].get('archivo_index') is not None:
+                archivo_index = result['codeudor']['archivo_index']
+                if archivo_index >= num_archivos:
+                    logger.warning(f"⚠️ archivo_index del codeudor ({archivo_index}) fuera de rango. Corrigiendo a 0")
+                    result['codeudor']['archivo_index'] = 0
+            
+            # Limpiar archivos subidos
+            for pdf_file in pdf_files:
+                try:
+                    genai.delete_file(pdf_file)
+                except Exception as e:
+                    logger.warning(f"⚠️ No se pudo eliminar archivo subido: {e}")
+            
+            return result, metadata
+            
+        except Exception as e:
+            logger.error(f"❌ Error identificando solicitudes de vinculación: {e}")
+            raise
 

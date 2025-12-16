@@ -6,10 +6,12 @@ Procesador para análisis de procesos CoreCoop con Gemini
 import logging
 import os
 import json
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 from core.database import DatabaseManager
 from core.gemini_client import GeminiClient
 from core.file_downloader import FileDownloader
+from core.file_uploader import FileUploader
+from core.pdf_extractor import PDFExtractor
 from config.settings import UPLOADS_DIR, GEMINI_CONFIG
 
 logger = logging.getLogger('bybot.processor')
@@ -22,6 +24,8 @@ class CrearCoopProcessor:
         self.db = DatabaseManager()
         self.gemini = GeminiClient()
         self.downloader = FileDownloader()
+        self.uploader = FileUploader()
+        self.pdf_extractor = PDFExtractor()
     
     def obtener_proceso_pendiente(self) -> Optional[Dict[str, Any]]:
         """Obtener un proceso en estado 'creado' para analizar"""
@@ -139,6 +143,33 @@ class CrearCoopProcessor:
             logger.error(f"❌ Error guardando datos de IA: {e}")
             raise
     
+    def actualizar_metadata_ia(self, proceso_id: int, metadata: Dict[str, Any]):
+        """Actualizar solo la metadata de IA sin cambiar los datos"""
+        try:
+            metadata_json = json.dumps(metadata, ensure_ascii=False)
+            
+            # Verificar si existe un registro
+            query_check = """
+                SELECT id FROM crear_coop_datos_ia WHERE proceso_id = %s
+            """
+            existe = self.db.execute_query(query_check, (proceso_id,), fetch_one=True)
+            
+            if existe:
+                # Actualizar solo metadata
+                query = """
+                    UPDATE crear_coop_datos_ia 
+                    SET metadata = %s
+                    WHERE proceso_id = %s
+                """
+                self.db.execute_update(query, (metadata_json, proceso_id))
+                logger.info(f"✅ Metadata de IA actualizada para proceso {proceso_id}")
+            else:
+                logger.warning(f"⚠️ No existe registro de datos IA para proceso {proceso_id}, no se puede actualizar metadata")
+            
+        except Exception as e:
+            logger.error(f"❌ Error actualizando metadata de IA: {e}")
+            raise
+    
     def procesar_proceso(self, proceso: Dict[str, Any]) -> bool:
         """Procesar un proceso completo"""
         proceso_id = proceso['id']
@@ -231,6 +262,28 @@ class CrearCoopProcessor:
             # Actualizar base de datos
             self.actualizar_datos_ia(proceso_id, datos_completos, metadata_completa)
             
+            # Extraer solicitudes de vinculación (OBLIGATORIO)
+            logger.info("📄 Extrayendo solicitudes de vinculación...")
+            try:
+                exito_extraccion, metadata_vinculacion = self.extraer_solicitudes_vinculacion(proceso_id, anexos_paths, anexos)
+                
+                if not exito_extraccion:
+                    raise Exception("No se pudo extraer la solicitud de vinculación del deudor")
+                
+                # Actualizar metadata con tokens de identificación de solicitudes
+                metadata_completa['tokens_identificacion_vinculacion'] = metadata_vinculacion
+                metadata_completa['tokens_entrada'] += metadata_vinculacion.get('tokens_entrada', 0)
+                metadata_completa['tokens_salida'] += metadata_vinculacion.get('tokens_salida', 0)
+                metadata_completa['tokens_total'] += metadata_vinculacion.get('tokens_total', 0)
+                
+                # Actualizar metadata en la BD
+                self.actualizar_metadata_ia(proceso_id, metadata_completa)
+                
+            except Exception as e:
+                logger.error(f"❌ Error extrayendo solicitudes de vinculación: {e}")
+                # FALLAR el proceso si no se pueden extraer las solicitudes
+                raise Exception(f"Error crítico: No se pudieron extraer las solicitudes de vinculación: {e}")
+            
             logger.info(f"✅ Proceso {codigo} analizado exitosamente")
             return True
             
@@ -262,6 +315,102 @@ class CrearCoopProcessor:
             if 'temp_files' in locals():
                 for temp_file in temp_files:
                     self.downloader.cleanup_temp_file(temp_file)
+    
+    def extraer_solicitudes_vinculacion(self, proceso_id: int, anexos_paths: list, anexos: list) -> Tuple[bool, Dict[str, Any]]:
+        """Extraer solicitudes de vinculación de los anexos y subirlas al servidor
+        Retorna: (exito, metadata_tokens)
+        """
+        try:
+            # Identificar qué páginas contienen las solicitudes
+            logger.info("🔍 Identificando páginas de solicitudes de vinculación...")
+            identificacion, metadata_tokens = self.gemini.identificar_solicitudes_vinculacion(anexos_paths)
+            
+            temp_extracted_files = []
+            deudor_extraido = False
+            codeudor_extraido = False
+            
+            # Extraer solicitud del deudor (OBLIGATORIO)
+            if identificacion.get('deudor') and identificacion['deudor'].get('archivo_index') is not None:
+                deudor_info = identificacion['deudor']
+                archivo_index = deudor_info['archivo_index']
+                paginas = deudor_info.get('paginas', [])
+                
+                # Validar índice
+                if archivo_index >= len(anexos_paths):
+                    logger.error(f"❌ archivo_index del deudor ({archivo_index}) fuera de rango. Total archivos: {len(anexos_paths)}")
+                    raise ValueError(f"archivo_index del deudor inválido: {archivo_index}")
+                
+                if len(paginas) < 2:
+                    logger.error(f"❌ Número insuficiente de páginas para deudor: {paginas}")
+                    raise ValueError(f"Se requieren al menos 2 páginas para la solicitud del deudor")
+                
+                logger.info(f"📄 Extrayendo solicitud de vinculación del deudor (páginas {paginas}) del archivo {archivo_index + 1}")
+                
+                # Extraer páginas
+                pdf_extraido = self.pdf_extractor.extract_pages(
+                    anexos_paths[archivo_index],
+                    paginas
+                )
+                temp_extracted_files.append(pdf_extraido)
+                
+                # Subir al servidor
+                if self.uploader.upload_file(proceso_id, pdf_extraido, 'solicitud_vinculacion_deudor'):
+                    logger.info("✅ Solicitud de vinculación del deudor extraída y subida exitosamente")
+                    deudor_extraido = True
+                else:
+                    logger.error("❌ Error al subir solicitud de vinculación del deudor")
+                    raise Exception("Error al subir solicitud de vinculación del deudor")
+            else:
+                logger.error("❌ No se encontró solicitud de vinculación del deudor (OBLIGATORIO)")
+                raise ValueError("No se encontró solicitud de vinculación del deudor")
+            
+            # Extraer solicitud del codeudor (OPCIONAL - no falla si no existe)
+            if identificacion.get('codeudor') and identificacion['codeudor'].get('archivo_index') is not None:
+                codeudor_info = identificacion['codeudor']
+                archivo_index = codeudor_info['archivo_index']
+                paginas = codeudor_info.get('paginas', [])
+                
+                # Validar índice
+                if archivo_index >= len(anexos_paths):
+                    logger.warning(f"⚠️ archivo_index del codeudor ({archivo_index}) fuera de rango. Total archivos: {len(anexos_paths)}")
+                    logger.info("ℹ️ Continuando sin solicitud de codeudor")
+                elif len(paginas) < 2:
+                    logger.warning(f"⚠️ Número insuficiente de páginas para codeudor: {paginas}")
+                    logger.info("ℹ️ Continuando sin solicitud de codeudor")
+                else:
+                    logger.info(f"📄 Extrayendo solicitud de vinculación del codeudor (páginas {paginas}) del archivo {archivo_index + 1}")
+                    
+                    # Extraer páginas
+                    pdf_extraido = self.pdf_extractor.extract_pages(
+                        anexos_paths[archivo_index],
+                        paginas
+                    )
+                    temp_extracted_files.append(pdf_extraido)
+                    
+                    # Subir al servidor
+                    if self.uploader.upload_file(proceso_id, pdf_extraido, 'solicitud_vinculacion_codeudor'):
+                        logger.info("✅ Solicitud de vinculación del codeudor extraída y subida exitosamente")
+                        codeudor_extraido = True
+                    else:
+                        logger.warning("⚠️ Error al subir solicitud de vinculación del codeudor (continuando)")
+            else:
+                logger.info("ℹ️ No se encontró solicitud de vinculación del codeudor (puede no existir)")
+            
+            # Limpiar archivos temporales extraídos
+            for temp_file in temp_extracted_files:
+                try:
+                    if os.path.exists(temp_file):
+                        os.remove(temp_file)
+                        logger.debug(f"🗑️ Archivo temporal eliminado: {temp_file}")
+                except Exception as e:
+                    logger.warning(f"⚠️ No se pudo eliminar archivo temporal {temp_file}: {e}")
+            
+            # Retornar éxito (deudor debe estar extraído) y metadata de tokens
+            return deudor_extraido, metadata_tokens
+                    
+        except Exception as e:
+            logger.error(f"❌ Error en extracción de solicitudes de vinculación: {e}")
+            raise
     
     def procesar_siguiente(self) -> bool:
         """Procesar el siguiente proceso pendiente"""
