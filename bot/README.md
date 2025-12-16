@@ -66,6 +66,10 @@ DB_USER=root
 DB_PASS=tu_contraseña
 DB_NAME=by_bot_app
 GEMINI_API_KEY=tu_api_key_de_google
+
+# Configuración del servidor PHP (para descargar archivos)
+SERVER_BASE_URL=http://localhost/bybot_app/admin
+BOT_API_TOKEN=tu_token_secreto_aqui
 ```
 
 ### 3. Obtener API Key de Gemini
@@ -73,6 +77,23 @@ GEMINI_API_KEY=tu_api_key_de_google
 1. Ve a [Google AI Studio](https://makersuite.google.com/app/apikey)
 2. Crea una nueva API key
 3. Cópiala al archivo `.env`
+
+### 4. Configurar Token de API para el Bot
+
+El bot necesita un token secreto para descargar archivos del servidor PHP de forma segura.
+
+**Generar token:**
+```bash
+# Generar un token aleatorio seguro
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+**Agregar al `.env`:**
+```env
+BOT_API_TOKEN=el_token_generado_aqui
+```
+
+**Importante:** El mismo token debe estar configurado en el servidor PHP (en el mismo archivo `.env`).
 
 ## 🔧 Uso
 

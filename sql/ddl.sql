@@ -4,8 +4,8 @@
 -- Sin llaves foráneas (relaciones a nivel de aplicación)
 -- =============================================
 
-CREATE DATABASE IF NOT EXISTS by_bot_app CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE by_bot_app;
+CREATE DATABASE IF NOT EXISTS bybot_app CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE bybot_app;
 
 -- =============================================
 -- TABLA DE USUARIOS DEL SISTEMA

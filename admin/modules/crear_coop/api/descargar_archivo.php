@@ -42,14 +42,19 @@ if ($procesoId > 0) {
         exit;
     }
     
+    // Convertir rutas relativas de BD a absolutas
+    $docRoot = $_SERVER['DOCUMENT_ROOT'] ?? '/opt/lampp/htdocs';
+    
     // Determinar qué archivo descargar según el tipo
     switch ($tipo) {
         case 'pagare':
-            $archivoPath = $proceso['archivo_pagare_original'] ?? null;
+            $rutaRelativa = $proceso['archivo_pagare_original'] ?? null;
+            $archivoPath = $rutaRelativa ? $docRoot . $rutaRelativa : null;
             $nombreArchivo = 'pagare_' . $proceso['codigo'] . '.pdf';
             break;
         case 'estado_cuenta':
-            $archivoPath = $proceso['archivo_estado_cuenta'] ?? null;
+            $rutaRelativa = $proceso['archivo_estado_cuenta'] ?? null;
+            $archivoPath = $rutaRelativa ? $docRoot . $rutaRelativa : null;
             $nombreArchivo = 'estado_cuenta_' . $proceso['codigo'] . '.pdf';
             break;
         case 'anexo':
@@ -57,7 +62,8 @@ if ($procesoId > 0) {
                 $anexos = $crearCoopModel->obtenerAnexos($procesoId);
                 foreach ($anexos as $anexo) {
                     if ($anexo['id'] == $fileId) {
-                        $archivoPath = $anexo['ruta_archivo'];
+                        $rutaRelativa = $anexo['ruta_archivo'];
+                        $archivoPath = $docRoot . $rutaRelativa;
                         $nombreArchivo = $anexo['nombre_archivo'];
                         break;
                     }
@@ -76,10 +82,10 @@ if (empty($archivoPath) || !file_exists($archivoPath)) {
 }
 
 // Validar que el archivo está dentro del directorio uploads
-$uploadsBase = realpath(__DIR__ . '/../../../../uploads/');
+$uploadsBase = realpath($docRoot . '/projects/bybot_app/uploads/');
 $archivoReal = realpath($archivoPath);
 
-if (!$archivoReal || strpos($archivoReal, $uploadsBase) !== 0) {
+if (!$uploadsBase || !$archivoReal || strpos($archivoReal, $uploadsBase) !== 0) {
     ob_end_clean();
     http_response_code(403);
     echo 'Acceso denegado';

@@ -19,8 +19,23 @@ $logger = new Logger();
 $message = '';
 $error = '';
 
-// Directorio de uploads
-$uploadsDir = __DIR__ . '/../../../../uploads/crear_coop/';
+// Directorio de uploads - desde la raíz del proyecto
+// Usar el mismo método que we_are_app
+$relativePath = __DIR__ . '/../../../../uploads/crear_coop';
+$uploadsDir = realpath($relativePath);
+if ($uploadsDir === false) {
+    // Si no existe, construir la ruta absoluta desde el directorio raíz del proyecto
+    // BASE_PATH es admin/, entonces dirname de su ruta absoluta da la raíz del proyecto
+    $basePathAbs = realpath(BASE_PATH);
+    if ($basePathAbs !== false) {
+        $projectRoot = dirname($basePathAbs);
+    } else {
+        // Fallback: calcular desde __DIR__
+        $projectRoot = dirname(dirname(dirname(dirname(__DIR__))));
+    }
+    $uploadsDir = $projectRoot . '/uploads/crear_coop';
+}
+$uploadsDir = rtrim($uploadsDir, '/') . '/';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
@@ -29,6 +44,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'estado_cuenta' => null,
             'anexos' => []
         ];
+        
+        // Función para convertir ruta absoluta a relativa desde la raíz del servidor web
+        $docRoot = $_SERVER['DOCUMENT_ROOT'] ?? '/opt/lampp/htdocs';
+        $convertToRelative = function($absolutePath) use ($docRoot) {
+            $absolutePath = realpath($absolutePath);
+            if ($absolutePath && strpos($absolutePath, $docRoot) === 0) {
+                return str_replace($docRoot, '', $absolutePath);
+            }
+            return $absolutePath;
+        };
         
         // Subir pagaré
         if (!empty($_FILES['archivo_pagare']['name'])) {
@@ -41,7 +66,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'maxSize' => 10 * 1024 * 1024 // 10MB
                 ]
             );
-            $archivos['pagare'] = $result['fullPath'];
+            // Guardar ruta relativa en BD
+            $archivos['pagare'] = $convertToRelative($result['fullPath']);
         }
         
         // Subir estado de cuenta
@@ -55,7 +81,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'maxSize' => 10 * 1024 * 1024 // 10MB
                 ]
             );
-            $archivos['estado_cuenta'] = $result['fullPath'];
+            // Guardar ruta relativa en BD
+            $archivos['estado_cuenta'] = $convertToRelative($result['fullPath']);
         }
         
         // Subir anexos (mínimo 1, máximo 5)
@@ -71,7 +98,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'maxSize' => 10 * 1024 * 1024 // 10MB
                     ]
                 );
-                $archivos['anexos'][] = $result['fullPath'];
+                // Guardar ruta relativa en BD
+                $archivos['anexos'][] = $convertToRelative($result['fullPath']);
                 $anexosCount++;
             }
         }

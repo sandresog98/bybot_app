@@ -9,6 +9,7 @@ import json
 from typing import Optional, Dict, Any
 from core.database import DatabaseManager
 from core.gemini_client import GeminiClient
+from core.file_downloader import FileDownloader
 from config.settings import UPLOADS_DIR, GEMINI_CONFIG
 
 logger = logging.getLogger('bybot.processor')
@@ -20,6 +21,7 @@ class CrearCoopProcessor:
         """Inicializar procesador"""
         self.db = DatabaseManager()
         self.gemini = GeminiClient()
+        self.downloader = FileDownloader()
     
     def obtener_proceso_pendiente(self) -> Optional[Dict[str, Any]]:
         """Obtener un proceso en estado 'creado' para analizar"""
@@ -148,27 +150,34 @@ class CrearCoopProcessor:
             # Actualizar estado a "analizando_con_ia"
             self.actualizar_estado(proceso_id, 'analizando_con_ia')
             
-            # Verificar que los archivos existan
-            estado_cuenta_path = proceso.get('archivo_estado_cuenta')
+            # Descargar archivos del servidor
+            temp_files = []  # Lista para limpiar archivos temporales al final
+            
+            # Descargar estado de cuenta
+            logger.info("📥 Descargando estado de cuenta del servidor...")
+            estado_cuenta_path = self.downloader.download_file(proceso_id, 'estado_cuenta')
             if not estado_cuenta_path or not os.path.exists(estado_cuenta_path):
-                raise FileNotFoundError(f"Estado de cuenta no encontrado: {estado_cuenta_path}")
+                raise FileNotFoundError(f"Estado de cuenta no encontrado o no se pudo descargar")
+            temp_files.append(estado_cuenta_path)
             
             # Obtener anexos
             anexos = self.obtener_anexos(proceso_id)
             if not anexos:
                 raise ValueError("No se encontraron anexos para el proceso")
             
-            # Verificar que los anexos existan
+            # Descargar anexos
+            logger.info(f"📥 Descargando {len(anexos)} anexo(s) del servidor...")
             anexos_paths = []
             for anexo in anexos:
-                ruta = anexo['ruta_archivo']
-                if not os.path.exists(ruta):
-                    logger.warning(f"⚠️ Anexo no encontrado: {ruta}")
-                    continue
-                anexos_paths.append(ruta)
+                anexo_path = self.downloader.download_file(proceso_id, 'anexo', anexo['id'])
+                if anexo_path and os.path.exists(anexo_path):
+                    anexos_paths.append(anexo_path)
+                    temp_files.append(anexo_path)
+                else:
+                    logger.warning(f"⚠️ No se pudo descargar anexo ID {anexo['id']}")
             
             if not anexos_paths:
-                raise FileNotFoundError("Ningún anexo válido encontrado")
+                raise FileNotFoundError("Ningún anexo válido encontrado o descargado")
             
             # Analizar estado de cuenta
             logger.info("📊 Analizando estado de cuenta...")
@@ -238,6 +247,12 @@ class CrearCoopProcessor:
                 except:
                     pass
             return False
+            
+        finally:
+            # Limpiar archivos temporales
+            if 'temp_files' in locals():
+                for temp_file in temp_files:
+                    self.downloader.cleanup_temp_file(temp_file)
     
     def procesar_siguiente(self) -> bool:
         """Procesar el siguiente proceso pendiente"""

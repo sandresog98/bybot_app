@@ -39,6 +39,13 @@ PROCESSING_CONFIG = {
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UPLOADS_DIR = os.path.join(BASE_DIR, 'uploads', 'crear_coop')
 
+# Configuración del servidor PHP (para descargar archivos)
+SERVER_CONFIG = {
+    'base_url': os.getenv('SERVER_BASE_URL', 'http://localhost/bybot_app/admin'),
+    'api_token': os.getenv('BOT_API_TOKEN', ''),
+    'timeout': 300  # Timeout para descargas (5 minutos)
+}
+
 # Logging
 LOG_DIR = os.path.join(BASE_DIR, 'bot', 'logs')
 LOG_FILE = os.path.join(LOG_DIR, 'bot.log')

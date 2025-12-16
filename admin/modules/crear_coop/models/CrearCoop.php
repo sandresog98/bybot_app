@@ -90,11 +90,16 @@ class CrearCoop {
     
     /**
      * Guardar anexo
+     * @param string $rutaArchivo Ruta relativa desde DOCUMENT_ROOT (ej: /projects/bybot_app/uploads/...)
      */
     public function guardarAnexo($procesoId, $rutaArchivo, $tipo = 'anexo_original') {
         try {
             $nombreArchivo = basename($rutaArchivo);
-            $tamanio = file_exists($rutaArchivo) ? filesize($rutaArchivo) : null;
+            
+            // Convertir ruta relativa a absoluta para obtener tamaño
+            $docRoot = $_SERVER['DOCUMENT_ROOT'] ?? '/opt/lampp/htdocs';
+            $rutaAbsoluta = $docRoot . $rutaArchivo;
+            $tamanio = file_exists($rutaAbsoluta) ? filesize($rutaAbsoluta) : null;
             
             $stmt = $this->conn->prepare("
                 INSERT INTO crear_coop_anexos (proceso_id, nombre_archivo, ruta_archivo, tipo, tamanio_bytes)
@@ -104,7 +109,7 @@ class CrearCoop {
             $stmt->execute([
                 $procesoId,
                 $nombreArchivo,
-                $rutaArchivo,
+                $rutaArchivo, // Guardar ruta relativa en BD
                 $tipo,
                 $tamanio
             ]);
