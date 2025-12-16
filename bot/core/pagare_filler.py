@@ -41,48 +41,48 @@ class PagareFiller:
         
         doc.close()
         
-        # Coordenadas aproximadas basadas en un pagaré estándar
-        # Estas coordenadas son relativas y se ajustan según el tamaño de la página
-        # IMPORTANTE: Estas coordenadas deben ajustarse según el formato real del pagaré
+        # Coordenadas ajustadas para el pagaré de CREARCOOP
+        # Los valores deben estar cerca de sus etiquetas en la columna izquierda
+        # Las etiquetas están aproximadamente en: x = 0.10-0.15, los valores deben ir justo después
         posiciones = {
             'capital': {
-                'x': page_width * 0.65,  # Lado derecho, aproximadamente
-                'y': page_height * 0.25,
+                'x': page_width * 0.42,  # Justo después de la etiqueta "CAPITAL." (más cerca)
+                'y': page_height * 0.18,  # Más arriba, cerca de la etiqueta
                 'page': 0
             },
             'interes_plazo': {
-                'x': page_width * 0.65,
-                'y': page_height * 0.30,
+                'x': page_width * 0.42,  # Justo después de la etiqueta "INTERÉS DE PLAZO."
+                'y': page_height * 0.21,  # Un poco más abajo que capital
                 'page': 0
             },
             'tasa_interes': {
-                'x': page_width * 0.65,
-                'y': page_height * 0.35,
+                'x': page_width * 0.42,  # Justo después de la etiqueta "TASA DE INTERÉS PLAZO."
+                'y': page_height * 0.24,  # Un poco más abajo que interes
                 'page': 0
             },
             'fecha_vencimiento': {
-                'x': page_width * 0.65,
-                'y': page_height * 0.40,
+                'x': page_width * 0.42,  # Justo después de la etiqueta "FECHA DE VENCIMIENTO."
+                'y': page_height * 0.27,  # Más arriba, cerca de su etiqueta (no en el texto legal)
                 'page': 0
             },
             'deudor_nombre': {
-                'x': page_width * 0.20,  # Lado izquierdo
-                'y': page_height * 0.55,
+                'x': page_width * 0.30,  # Dentro del recuadro blanco de DEUDOR(ES)
+                'y': page_height * 0.32,  # En el recuadro blanco, no en el texto legal
                 'page': 0
             },
             'codeudor_nombre': {
-                'x': page_width * 0.20,
-                'y': page_height * 0.60,
+                'x': page_width * 0.30,  # Dentro del recuadro blanco, debajo del deudor
+                'y': page_height * 0.36,  # Un poco más abajo que deudor
                 'page': 0
             },
             'deudor_cedula': {
-                'x': page_width * 0.20,
-                'y': page_height * 0.65,
+                'x': page_width * 0.30,  # En el recuadro, debajo del nombre del deudor
+                'y': page_height * 0.40,  # Más abajo que el nombre
                 'page': 0
             },
             'codeudor_cedula': {
-                'x': page_width * 0.20,
-                'y': page_height * 0.70,
+                'x': page_width * 0.30,  # En el recuadro, debajo del nombre del codeudor
+                'y': page_height * 0.44,  # Más abajo que el nombre del codeudor
                 'page': 0
             },
             'endoso': {
@@ -187,84 +187,95 @@ class PagareFiller:
             if len(doc) > 0:
                 page = doc[0]
                 
-                # CAPITAL
+                # Usar fontsize ligeramente más grande para mejor legibilidad
+                fontsize = 11
+                
+                # CAPITAL - Justo después de la etiqueta "CAPITAL."
                 if 'capital' in posiciones:
                     pos = posiciones['capital']
                     page.insert_text(
                         (pos['x'], pos['y']),
                         capital_str,
-                        fontsize=10,
-                        color=(0, 0, 0)
+                        fontsize=fontsize,
+                        color=(0, 0, 0),
+                        render_mode=0  # Modo de renderizado normal
                     )
                 
-                # INTERÉS DE PLAZO
+                # INTERÉS DE PLAZO - Justo después de la etiqueta "INTERÉS DE PLAZO."
                 if 'interes_plazo' in posiciones:
                     pos = posiciones['interes_plazo']
                     page.insert_text(
                         (pos['x'], pos['y']),
                         interes_plazo_str,
-                        fontsize=10,
-                        color=(0, 0, 0)
+                        fontsize=fontsize,
+                        color=(0, 0, 0),
+                        render_mode=0
                     )
                 
-                # TASA DE INTERÉS
+                # TASA DE INTERÉS - Justo después de la etiqueta "TASA DE INTERÉS PLAZO."
                 if 'tasa_interes' in posiciones:
                     pos = posiciones['tasa_interes']
                     page.insert_text(
                         (pos['x'], pos['y']),
                         tasa_interes_str,
-                        fontsize=10,
-                        color=(0, 0, 0)
+                        fontsize=fontsize,
+                        color=(0, 0, 0),
+                        render_mode=0
                     )
                 
-                # FECHA DE VENCIMIENTO
+                # FECHA DE VENCIMIENTO - Justo después de la etiqueta, no en el texto legal
                 if 'fecha_vencimiento' in posiciones and fecha_formateada:
                     pos = posiciones['fecha_vencimiento']
                     page.insert_text(
                         (pos['x'], pos['y']),
                         fecha_formateada,
-                        fontsize=10,
-                        color=(0, 0, 0)
+                        fontsize=fontsize,
+                        color=(0, 0, 0),
+                        render_mode=0
                     )
                 
-                # DEUDOR - Nombre
+                # DEUDOR - Nombre (en el recuadro blanco, no en el texto legal)
                 if 'deudor_nombre' in posiciones and deudor_nombre:
                     pos = posiciones['deudor_nombre']
                     page.insert_text(
                         (pos['x'], pos['y']),
                         deudor_nombre,
-                        fontsize=10,
-                        color=(0, 0, 0)
+                        fontsize=fontsize,
+                        color=(0, 0, 0),
+                        render_mode=0
                     )
                 
-                # CODEUDOR - Nombre (si existe)
+                # CODEUDOR - Nombre (en el recuadro blanco, debajo del deudor)
                 if 'codeudor_nombre' in posiciones and codeudor_nombre:
                     pos = posiciones['codeudor_nombre']
                     page.insert_text(
                         (pos['x'], pos['y']),
                         codeudor_nombre,
-                        fontsize=10,
-                        color=(0, 0, 0)
+                        fontsize=fontsize,
+                        color=(0, 0, 0),
+                        render_mode=0
                     )
                 
-                # DEUDOR - Cédula
+                # DEUDOR - Cédula (en el recuadro blanco)
                 if 'deudor_cedula' in posiciones and deudor_cedula:
                     pos = posiciones['deudor_cedula']
                     page.insert_text(
                         (pos['x'], pos['y']),
                         deudor_cedula,
-                        fontsize=10,
-                        color=(0, 0, 0)
+                        fontsize=fontsize,
+                        color=(0, 0, 0),
+                        render_mode=0
                     )
                 
-                # CODEUDOR - Cédula (si existe)
+                # CODEUDOR - Cédula (en el recuadro blanco)
                 if 'codeudor_cedula' in posiciones and codeudor_cedula:
                     pos = posiciones['codeudor_cedula']
                     page.insert_text(
                         (pos['x'], pos['y']),
                         codeudor_cedula,
-                        fontsize=10,
-                        color=(0, 0, 0)
+                        fontsize=fontsize,
+                        color=(0, 0, 0),
+                        render_mode=0
                     )
             
             # Agregar texto del endoso en la segunda página
