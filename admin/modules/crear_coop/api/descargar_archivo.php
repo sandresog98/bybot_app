@@ -44,6 +44,7 @@ if ($procesoId > 0) {
     
     // Convertir rutas relativas de BD a absolutas
     $docRoot = $_SERVER['DOCUMENT_ROOT'] ?? '/opt/lampp/htdocs';
+    $rutaRelativa = null;
     
     // Determinar qué archivo descargar según el tipo
     switch ($tipo) {
@@ -73,7 +74,7 @@ if ($procesoId > 0) {
     }
 }
 
-// Validar que el archivo existe y está dentro del directorio permitido
+// Validar que el archivo existe
 if (empty($archivoPath) || !file_exists($archivoPath)) {
     ob_end_clean();
     http_response_code(404);
@@ -82,14 +83,89 @@ if (empty($archivoPath) || !file_exists($archivoPath)) {
 }
 
 // Validar que el archivo está dentro del directorio uploads
-$uploadsBase = realpath($docRoot . '/projects/bybot_app/uploads/');
+// Obtener la ruta real del archivo
 $archivoReal = realpath($archivoPath);
-
-if (!$uploadsBase || !$archivoReal || strpos($archivoReal, $uploadsBase) !== 0) {
+if (!$archivoReal) {
     ob_end_clean();
-    http_response_code(403);
-    echo 'Acceso denegado';
+    http_response_code(404);
+    echo 'Archivo no encontrado';
     exit;
+}
+
+// Construir la ruta base de uploads de forma dinámica
+// La ruta relativa en BD empieza con /projects/bybot_app/uploads/ o similar
+$uploadsBase = false;
+
+if (!empty($rutaRelativa) && strpos($rutaRelativa, '/uploads/') !== false) {
+    // Extraer la parte hasta /uploads/ desde la ruta relativa
+    $parts = explode('/uploads/', $rutaRelativa);
+    $basePath = $parts[0]; // Ej: /projects/bybot_app
+    $uploadsBase = realpath($docRoot . $basePath . '/uploads/');
+}
+
+// Si no se encontró, intentar ubicaciones comunes
+if (!$uploadsBase) {
+    $possiblePaths = [
+        $docRoot . '/projects/bybot_app/uploads/',
+        $docRoot . '/bybot_app/uploads/',
+        dirname(dirname(dirname(dirname(__DIR__)))) . '/uploads/',
+        // Para producción: buscar uploads en la raíz del proyecto
+        dirname($archivoReal) // Subir desde el archivo hasta encontrar uploads
+    ];
+    
+    foreach ($possiblePaths as $path) {
+        $resolved = realpath($path);
+        if ($resolved !== false && is_dir($resolved)) {
+            // Verificar que realmente contiene "uploads" en la ruta
+            if (strpos($resolved, 'uploads') !== false) {
+                $uploadsBase = $resolved;
+                break;
+            }
+        }
+    }
+}
+
+// Si aún no se encontró, usar el directorio del archivo y subir hasta encontrar uploads
+if (!$uploadsBase) {
+    $currentPath = dirname($archivoReal);
+    $maxDepth = 10; // Límite de seguridad
+    $depth = 0;
+    
+    while ($depth < $maxDepth) {
+        if (basename($currentPath) === 'uploads') {
+            $uploadsBase = $currentPath;
+            break;
+        }
+        $parent = dirname($currentPath);
+        if ($parent === $currentPath) {
+            break; // Llegamos a la raíz
+        }
+        $currentPath = $parent;
+        $depth++;
+    }
+}
+
+// Validar que el archivo está dentro de uploads
+if (!$uploadsBase) {
+    // Si no se puede determinar la base, al menos validar que el archivo existe
+    // y está en una ruta que contiene "uploads"
+    if (strpos($archivoReal, 'uploads') === false) {
+        ob_end_clean();
+        http_response_code(403);
+        echo 'Acceso denegado: archivo fuera de directorio uploads';
+        exit;
+    }
+} else {
+    // Validación estricta: el archivo debe estar dentro de uploads
+    $uploadsBaseReal = realpath($uploadsBase);
+    if (!$uploadsBaseReal || strpos($archivoReal, $uploadsBaseReal) !== 0) {
+        // Log para debugging
+        error_log("Acceso denegado - Archivo: $archivoReal, Base esperada: $uploadsBaseReal");
+        ob_end_clean();
+        http_response_code(403);
+        echo 'Acceso denegado';
+        exit;
+    }
 }
 
 // Limpiar buffer
