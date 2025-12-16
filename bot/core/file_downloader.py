@@ -17,12 +17,19 @@ class FileDownloader:
     
     def __init__(self):
         """Inicializar descargador"""
-        self.base_url = SERVER_CONFIG['base_url']
-        self.api_token = SERVER_CONFIG['api_token']
+        base_url = SERVER_CONFIG['base_url'].rstrip('/')
+        # Asegurar que la URL termine con /admin si no está presente
+        if not base_url.endswith('/admin'):
+            base_url = base_url + '/admin'
+        self.base_url = base_url
+        # Limpiar token (eliminar espacios y saltos de línea)
+        self.api_token = SERVER_CONFIG['api_token'].strip() if SERVER_CONFIG['api_token'] else ''
         self.timeout = SERVER_CONFIG['timeout']
         
         if not self.api_token:
             logger.warning("⚠️ BOT_API_TOKEN no configurada. Las descargas pueden fallar.")
+        else:
+            logger.debug(f"🔑 Token configurado (longitud: {len(self.api_token)})")
     
     def download_file(self, proceso_id: int, tipo: str, anexo_id: Optional[int] = None) -> Optional[str]:
         """
@@ -48,9 +55,13 @@ class FileDownloader:
                 params['anexo_id'] = anexo_id
             
             # Headers con token de autenticación
+            # Asegurar que el token esté limpio
+            clean_token = self.api_token.strip()
             headers = {
-                'X-API-Token': self.api_token
+                'X-API-Token': clean_token
             }
+            
+            logger.debug(f"🔑 Enviando token (longitud: {len(clean_token)}, primeros 10 chars: {clean_token[:10]}...)")
             
             logger.info(f"📥 Descargando {tipo} del proceso {proceso_id}...")
             
@@ -66,9 +77,24 @@ class FileDownloader:
             # Verificar respuesta
             if response.status_code == 401:
                 logger.error("❌ Error de autenticación: Token de API inválido o faltante")
+                logger.error(f"   URL: {url}")
+                logger.error(f"   Token enviado: {'Sí' if self.api_token else 'No'}")
+                try:
+                    error_data = response.json()
+                    logger.error(f"   Mensaje del servidor: {error_data.get('error', 'N/A')}")
+                except:
+                    logger.error(f"   Respuesta: {response.text[:200]}")
                 return None
             elif response.status_code == 403:
                 logger.error("❌ Error de autorización: Token de API no autorizado")
+                logger.error(f"   URL: {url}")
+                logger.error(f"   Token configurado: {'Sí' if self.api_token else 'No'}")
+                logger.error(f"   Verifica que BOT_API_TOKEN en .env del servidor coincida con el del bot")
+                try:
+                    error_data = response.json()
+                    logger.error(f"   Mensaje del servidor: {error_data.get('error', 'N/A')}")
+                except:
+                    logger.error(f"   Respuesta: {response.text[:200]}")
                 return None
             elif response.status_code == 404:
                 logger.error(f"❌ Archivo no encontrado: {tipo} del proceso {proceso_id}")
