@@ -5,8 +5,9 @@
 .cursor/
 
 # Archivos subidos (no versionar)
-uploads/
+uploads/*
 !uploads/.gitkeep
+!uploads/.htaccess
 
 # Logs
 *.log
