@@ -29,7 +29,7 @@ print()
 # Probar endpoint
 url = f"{base_url}/modules/crear_coop/api/serve_file_for_bot.php"
 params = {
-    'proceso_id': 1,
+    'proceso_id': 3,
     'tipo': 'estado_cuenta'
 }
 
