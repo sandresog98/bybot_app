@@ -1,0 +1,35 @@
+# Bloquear acceso directo a archivos en uploads
+# ByBot App - Seguridad
+# Los archivos solo se pueden acceder mediante el endpoint seguro: descargar_archivo.php
+
+# Apache 2.2
+<IfModule !mod_authz_core.c>
+    # Denegar acceso a todos los archivos
+    <FilesMatch "\.(pdf|jpg|jpeg|png|gif|doc|docx|xls|xlsx|zip|rar|txt|csv)$">
+        Order Allow,Deny
+        Deny from all
+    </FilesMatch>
+</IfModule>
+
+# Apache 2.4+
+<IfModule mod_authz_core.c>
+    # Denegar acceso a todos los archivos
+    <FilesMatch "\.(pdf|jpg|jpeg|png|gif|doc|docx|xls|xlsx|zip|rar|txt|csv)$">
+        Require all denied
+    </FilesMatch>
+</IfModule>
+
+# Bloquear acceso a directorios (listado de archivos)
+Options -Indexes
+
+# Prevenir ejecución de scripts PHP en este directorio
+<FilesMatch "\.php$">
+    <IfModule !mod_authz_core.c>
+        Order Allow,Deny
+        Deny from all
+    </IfModule>
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+</FilesMatch>
+
