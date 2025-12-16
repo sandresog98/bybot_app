@@ -166,20 +166,104 @@ switch ($tipo) {
         exit;
 }
 
-// Validar que el archivo existe y está dentro del directorio permitido
-if (empty($archivoPath) || !file_exists($archivoPath)) {
+// Validar que el archivo existe
+if (empty($archivoPath)) {
     http_response_code(404);
-    echo json_encode(['error' => 'Archivo no encontrado']);
+    echo json_encode(['error' => 'Ruta de archivo vacía', 'proceso_id' => $procesoId, 'tipo' => $tipo]);
     exit;
 }
 
-$uploadsBase = realpath($docRoot . '/projects/bybot_app/uploads/');
+if (!file_exists($archivoPath)) {
+    http_response_code(404);
+    $isDevelopment = getenv('APP_ENV') === 'development' || empty(getenv('APP_ENV'));
+    $response = ['error' => 'Archivo no encontrado'];
+    if ($isDevelopment) {
+        $response['debug'] = [
+            'archivo_path' => $archivoPath,
+            'doc_root' => $docRoot,
+            'ruta_relativa' => $rutaRelativa ?? 'N/A',
+            'existe' => file_exists($archivoPath) ? 'Sí' : 'No'
+        ];
+    }
+    echo json_encode($response);
+    exit;
+}
+
 $archivoReal = realpath($archivoPath);
 
-if (!$uploadsBase || !$archivoReal || strpos($archivoReal, $uploadsBase) !== 0) {
-    http_response_code(403);
-    echo json_encode(['error' => 'Acceso denegado']);
-    exit;
+// Validar que el archivo está dentro de uploads
+// Buscar uploads en DOCUMENT_ROOT (producción) o en la ruta relativa (desarrollo)
+$uploadsBase = null;
+$possibleUploadsPaths = [
+    $docRoot . '/uploads/',  // Producción: DOCUMENT_ROOT/uploads/
+    $docRoot . '/projects/bybot_app/uploads/',  // Desarrollo local
+];
+
+foreach ($possibleUploadsPaths as $path) {
+    $resolved = realpath($path);
+    if ($resolved !== false && is_dir($resolved)) {
+        $uploadsBase = $resolved;
+        break;
+    }
+}
+
+// Si no se encontró, buscar desde el archivo hacia arriba
+if (!$uploadsBase && $archivoReal) {
+    $currentPath = dirname($archivoReal);
+    $maxDepth = 10;
+    $depth = 0;
+    
+    while ($depth < $maxDepth && $currentPath) {
+        if (basename($currentPath) === 'uploads') {
+            $uploadsBase = $currentPath;
+            break;
+        }
+        $parent = dirname($currentPath);
+        if ($parent === $currentPath) {
+            break;
+        }
+        $currentPath = $parent;
+        $depth++;
+    }
+}
+
+// Validación de seguridad
+if (!$uploadsBase) {
+    // Si no se puede determinar la base, al menos validar que el archivo existe
+    // y está en una ruta que contiene "uploads"
+    if (strpos($archivoReal, 'uploads') === false) {
+        error_log("Acceso denegado - No se encontró directorio uploads. Archivo: $archivoReal, DOCUMENT_ROOT: $docRoot");
+        http_response_code(403);
+        echo json_encode(['error' => 'Acceso denegado: archivo fuera de directorio uploads']);
+        exit;
+    }
+    // Si contiene "uploads" pero no encontramos la base, permitir (menos estricto)
+} else {
+    // Validación estricta: el archivo debe estar dentro de uploads
+    $uploadsBaseReal = realpath($uploadsBase);
+    if (!$uploadsBaseReal) {
+        error_log("Acceso denegado - No se pudo resolver ruta de uploads: $uploadsBase");
+        http_response_code(403);
+        echo json_encode(['error' => 'Acceso denegado']);
+        exit;
+    }
+    
+    if (strpos($archivoReal, $uploadsBaseReal) !== 0) {
+        error_log("Acceso denegado - Archivo: $archivoReal, Base esperada: $uploadsBaseReal");
+        $isDevelopment = getenv('APP_ENV') === 'development' || empty(getenv('APP_ENV'));
+        $response = ['error' => 'Acceso denegado'];
+        if ($isDevelopment) {
+            $response['debug'] = [
+                'archivo_real' => $archivoReal,
+                'uploads_base' => $uploadsBaseReal,
+                'doc_root' => $docRoot,
+                'ruta_relativa' => $rutaRelativa ?? 'N/A'
+            ];
+        }
+        http_response_code(403);
+        echo json_encode($response);
+        exit;
+    }
 }
 
 // Servir el archivo
