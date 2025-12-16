@@ -74,8 +74,8 @@ if ($procesoId <= 0 || empty($tipo)) {
     exit;
 }
 
-// Validar tipo
-$tiposPermitidos = ['solicitud_vinculacion_deudor', 'solicitud_vinculacion_codeudor'];
+// Validar tipo - Incluye: solicitud_vinculacion_deudor, solicitud_vinculacion_codeudor, pagare_llenado
+$tiposPermitidos = array('solicitud_vinculacion_deudor', 'solicitud_vinculacion_codeudor', 'pagare_llenado');
 if (!in_array($tipo, $tiposPermitidos, true)) {
     http_response_code(400);
     echo json_encode(['error' => 'Tipo inválido. Valores permitidos: ' . implode(', ', $tiposPermitidos)]);
@@ -93,6 +93,7 @@ require_once __DIR__ . '/../../../../config/database.php';
 require_once '../models/CrearCoop.php';
 require_once __DIR__ . '/../../../../admin/utils/FileUploadManager.php';
 
+$conn = getConnection();
 $crearCoopModel = new CrearCoop();
 $proceso = $crearCoopModel->obtenerProceso($procesoId);
 
@@ -105,7 +106,12 @@ if (!$proceso) {
 try {
     // Determinar directorio de destino según el tipo
     $docRoot = $_SERVER['DOCUMENT_ROOT'] ?? '/opt/lampp/htdocs';
-    $baseDir = $docRoot . '/uploads/crear_coop/solicitudes_vinculacion';
+    
+    if ($tipo === 'pagare_llenado') {
+        $baseDir = $docRoot . '/uploads/crear_coop/pagares_llenados';
+    } else {
+        $baseDir = $docRoot . '/uploads/crear_coop/solicitudes_vinculacion';
+    }
     
     // Crear subdirectorios por año/mes
     $year = date('Y');
@@ -136,21 +142,38 @@ try {
     // Ruta relativa desde DOCUMENT_ROOT
     $rutaRelativa = str_replace($docRoot, '', $fullPath);
     
-    // Guardar en base de datos
-    $anexoId = $crearCoopModel->guardarAnexo($procesoId, $rutaRelativa, $tipo);
-    
-    if (!$anexoId) {
-        // Si falla guardar en BD, eliminar archivo
-        @unlink($fullPath);
-        throw new Exception('No se pudo guardar el registro en la base de datos');
+    // Si es pagaré llenado, guardar directamente en el proceso
+    if ($tipo === 'pagare_llenado') {
+        $stmt = $conn->prepare("
+            UPDATE crear_coop_procesos 
+            SET archivo_pagare_llenado = ?,
+                fecha_actualizacion = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        $stmt->execute([$rutaRelativa, $procesoId]);
+        
+        echo json_encode([
+            'success' => true,
+            'message' => 'Pagaré llenado subido exitosamente',
+            'ruta_archivo' => $rutaRelativa
+        ]);
+    } else {
+        // Guardar en base de datos como anexo
+        $anexoId = $crearCoopModel->guardarAnexo($procesoId, $rutaRelativa, $tipo);
+        
+        if (!$anexoId) {
+            // Si falla guardar en BD, eliminar archivo
+            @unlink($fullPath);
+            throw new Exception('No se pudo guardar el registro en la base de datos');
+        }
+        
+        echo json_encode([
+            'success' => true,
+            'message' => 'Archivo subido exitosamente',
+            'ruta_archivo' => $rutaRelativa,
+            'anexo_id' => $anexoId
+        ]);
     }
-    
-    echo json_encode([
-        'success' => true,
-        'message' => 'Archivo subido exitosamente',
-        'ruta_archivo' => $rutaRelativa,
-        'anexo_id' => $anexoId
-    ]);
     
 } catch (Exception $e) {
     error_log('Error en upload_file_from_bot.php: ' . $e->getMessage());

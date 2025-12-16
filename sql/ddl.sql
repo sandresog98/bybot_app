@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS control_logs (
 CREATE TABLE IF NOT EXISTS crear_coop_procesos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     codigo VARCHAR(50) UNIQUE NOT NULL,
-    estado VARCHAR(30) DEFAULT 'creado' COMMENT 'Estados: creado, analizando_con_ia, analizado_con_ia, informacion_ia_validada, archivos_extraidos, llenar_pagare, error_analisis',
+    estado VARCHAR(30) DEFAULT 'creado' COMMENT 'Estados: creado, analizando_con_ia, analizado_con_ia, informacion_ia_validada, archivos_extraidos, llenar_pagare, con_pagare, error_analisis',
     -- Archivos generados
     archivo_pagare_original VARCHAR(255) NULL,
     archivo_estado_cuenta VARCHAR(255) NULL,
@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS crear_coop_anexos (
     proceso_id INT NOT NULL,
     nombre_archivo VARCHAR(255) NOT NULL,
     ruta_archivo VARCHAR(500) NOT NULL,
-    tipo VARCHAR(20) DEFAULT 'anexo_original',
+    tipo VARCHAR(50) DEFAULT 'anexo_original',
     tamanio_bytes INT NULL,
     fecha_subida TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_proceso (proceso_id),

@@ -356,6 +356,32 @@ function renderCampoValidacion($label, $campo, $valorOriginal, $valorValidado, $
                                 </div>
                                 <?php endif; ?>
                                 
+                                <?php if ($proceso['archivo_pagare_llenado']): ?>
+                                <div class="mb-3 pb-2 border-top pt-3 mt-3">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <div>
+                                            <strong class="text-success">
+                                                <i class="fas fa-file-signature me-2"></i>Pagaré Llenado
+                                            </strong>
+                                            <small class="text-muted d-block">Completado automáticamente por IA</small>
+                                        </div>
+                                        <div>
+                                            <a href="<?php echo getBaseUrl(); ?>modules/crear_coop/api/descargar_archivo.php?proceso_id=<?php echo $procesoId; ?>&tipo=pagare_llenado&ver=1" 
+                                               target="_blank"
+                                               class="btn btn-sm btn-outline-info me-1" 
+                                               title="Ver archivo">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="<?php echo getBaseUrl(); ?>modules/crear_coop/api/descargar_archivo.php?proceso_id=<?php echo $procesoId; ?>&tipo=pagare_llenado" 
+                                               class="btn btn-sm btn-outline-primary" 
+                                               title="Descargar archivo">
+                                                <i class="fas fa-download"></i>
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <?php endif; ?>
+                                
                                 <?php if ($proceso['archivo_estado_cuenta']): ?>
                                 <div class="mb-3 pb-2 border-bottom">
                                     <div class="d-flex align-items-center justify-content-between">

@@ -27,6 +27,7 @@ $estados = [
     'informacion_ia_validada' => ['label' => 'Información IA Validada', 'class' => 'bg-success'],
     'archivos_extraidos' => ['label' => 'Archivos Extraídos', 'class' => 'bg-warning text-dark'],
     'llenar_pagare' => ['label' => 'Llenar Pagaré', 'class' => 'bg-success'],
+    'con_pagare' => ['label' => 'Con Pagaré', 'class' => 'bg-success'],
     'error_analisis' => ['label' => 'Error Análisis', 'class' => 'bg-danger']
 ];
 

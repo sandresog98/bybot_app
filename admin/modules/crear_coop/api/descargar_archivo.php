@@ -53,6 +53,11 @@ if ($procesoId > 0) {
             $archivoPath = $rutaRelativa ? $docRoot . $rutaRelativa : null;
             $nombreArchivo = 'pagare_' . $proceso['codigo'] . '.pdf';
             break;
+        case 'pagare_llenado':
+            $rutaRelativa = $proceso['archivo_pagare_llenado'] ?? null;
+            $archivoPath = $rutaRelativa ? $docRoot . $rutaRelativa : null;
+            $nombreArchivo = 'pagare_llenado_' . $proceso['codigo'] . '.pdf';
+            break;
         case 'estado_cuenta':
             $rutaRelativa = $proceso['archivo_estado_cuenta'] ?? null;
             $archivoPath = $rutaRelativa ? $docRoot . $rutaRelativa : null;

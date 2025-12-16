@@ -37,15 +37,21 @@ class FileUploader:
         Args:
             proceso_id: ID del proceso
             file_path: Ruta local del archivo a subir
-            tipo: Tipo de archivo ('solicitud_vinculacion_deudor', 'solicitud_vinculacion_codeudor')
+            tipo: Tipo de archivo ('solicitud_vinculacion_deudor', 'solicitud_vinculacion_codeudor', 'pagare_llenado')
             nombre_archivo: Nombre del archivo (opcional, se usa el nombre del archivo local si no se proporciona)
         
         Returns:
             True si la subida fue exitosa, False en caso contrario
         """
+        file_handle = None
         try:
             if not os.path.exists(file_path):
                 logger.error(f"❌ Archivo no encontrado: {file_path}")
+                return False
+            
+            file_size = os.path.getsize(file_path)
+            if file_size == 0:
+                logger.error(f"❌ El archivo está vacío: {file_path}")
                 return False
             
             # Construir URL
@@ -53,6 +59,10 @@ class FileUploader:
             
             # Headers con token de autenticación
             clean_token = self.api_token.strip()
+            if not clean_token:
+                logger.error("❌ Token de API no configurado")
+                return False
+            
             headers = {
                 'X-API-Token': clean_token
             }
@@ -61,9 +71,12 @@ class FileUploader:
             if nombre_archivo is None:
                 nombre_archivo = os.path.basename(file_path)
             
+            # Abrir archivo con contexto para asegurar que se cierre
+            file_handle = open(file_path, 'rb')
+            
             # Datos del formulario
             files = {
-                'archivo': (nombre_archivo, open(file_path, 'rb'), 'application/pdf')
+                'archivo': (nombre_archivo, file_handle, 'application/pdf')
             }
             
             data = {
@@ -72,7 +85,9 @@ class FileUploader:
             }
             
             logger.info(f"📤 Subiendo {tipo} del proceso {proceso_id}...")
-            logger.debug(f"   Archivo: {file_path} ({os.path.getsize(file_path)} bytes)")
+            logger.debug(f"   URL: {url}")
+            logger.debug(f"   Archivo: {file_path} ({file_size} bytes)")
+            logger.debug(f"   Tipo: {tipo}")
             
             # Realizar petición
             response = requests.post(
@@ -83,21 +98,22 @@ class FileUploader:
                 timeout=self.timeout
             )
             
-            # Cerrar archivo
-            files['archivo'][1].close()
-            
             # Verificar respuesta
             if response.status_code == 401:
                 logger.error("❌ Error de autenticación: Token de API inválido o faltante")
+                logger.debug(f"   Respuesta: {response.text[:200]}")
                 return False
             elif response.status_code == 403:
                 logger.error("❌ Error de autorización: Token de API no autorizado")
+                logger.debug(f"   Respuesta: {response.text[:200]}")
                 return False
             elif response.status_code != 200:
                 logger.error(f"❌ Error HTTP {response.status_code}: {response.text[:200]}")
                 try:
                     error_data = response.json()
                     logger.error(f"   Mensaje: {error_data.get('error', 'N/A')}")
+                    if 'message' in error_data:
+                        logger.error(f"   Detalle: {error_data.get('message', 'N/A')}")
                 except:
                     pass
                 return False
@@ -109,10 +125,12 @@ class FileUploader:
                     logger.info(f"✅ Archivo subido exitosamente: {result.get('ruta_archivo', 'N/A')}")
                     return True
                 else:
-                    logger.error(f"❌ Error al subir archivo: {result.get('message', 'Error desconocido')}")
+                    error_msg = result.get('message', result.get('error', 'Error desconocido'))
+                    logger.error(f"❌ Error al subir archivo: {error_msg}")
                     return False
             except Exception as e:
                 logger.error(f"❌ Error parseando respuesta del servidor: {e}")
+                logger.debug(f"   Respuesta raw: {response.text[:500]}")
                 return False
             
         except requests.exceptions.Timeout:
@@ -120,8 +138,16 @@ class FileUploader:
             return False
         except requests.exceptions.ConnectionError as e:
             logger.error(f"❌ Error de conexión al servidor: {e}")
+            logger.debug(f"   URL intentada: {url if 'url' in locals() else 'N/A'}")
             return False
         except Exception as e:
-            logger.error(f"❌ Error inesperado al subir archivo: {e}")
+            logger.error(f"❌ Error inesperado al subir archivo: {e}", exc_info=True)
             return False
+        finally:
+            # Asegurar que el archivo se cierre
+            if file_handle is not None:
+                try:
+                    file_handle.close()
+                except:
+                    pass
 

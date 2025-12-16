@@ -11,6 +11,7 @@ import logging
 from config.logging_config import setup_logging
 from config.settings import PROCESSING_CONFIG
 from processors.crear_coop_processor import CrearCoopProcessor
+from processors.pagare_filler_processor import PagareFillerProcessor
 
 # Configurar logging
 logger = setup_logging()
@@ -37,29 +38,37 @@ def main():
     logger.info(f"⏱️  Intervalo de consulta: {PROCESSING_CONFIG['poll_interval']} segundos")
     
     processor = CrearCoopProcessor()
+    pagare_processor = PagareFillerProcessor()
     poll_interval = PROCESSING_CONFIG['poll_interval']
     
     try:
         procesos_sin_procesar = 0
         while running:
             try:
-                # Intentar procesar siguiente proceso
+                # Primero intentar procesar análisis de procesos
                 procesado = processor.procesar_siguiente()
                 
                 if procesado:
-                    logger.info("✅ Proceso procesado exitosamente")
-                    procesos_sin_procesar = 0  # Resetear contador si procesó algo
+                    logger.info("✅ Proceso analizado exitosamente")
+                    procesos_sin_procesar = 0
                 else:
-                    # No hay procesos pendientes
-                    procesos_sin_procesar += 1
+                    # Si no hay procesos para analizar, intentar llenar pagarés
+                    procesado_pagare = pagare_processor.procesar_siguiente()
                     
-                    # Si no hay procesos pendientes y ya esperamos varias veces, terminar
-                    if procesos_sin_procesar >= 3:
-                        logger.info("✅ No hay más procesos pendientes. Bot finalizado.")
-                        break
-                    
-                    logger.info(f"⏳ No hay procesos pendientes. Esperando {poll_interval}s... (intento {procesos_sin_procesar}/3)")
-                    time.sleep(poll_interval)
+                    if procesado_pagare:
+                        logger.info("✅ Pagaré llenado exitosamente")
+                        procesos_sin_procesar = 0
+                    else:
+                        # No hay procesos pendientes
+                        procesos_sin_procesar += 1
+                        
+                        # Si no hay procesos pendientes y ya esperamos varias veces, terminar
+                        if procesos_sin_procesar >= 3:
+                            logger.info("✅ No hay más procesos pendientes. Bot finalizado.")
+                            break
+                        
+                        logger.info(f"⏳ No hay procesos pendientes. Esperando {poll_interval}s... (intento {procesos_sin_procesar}/3)")
+                        time.sleep(poll_interval)
                     
             except KeyboardInterrupt:
                 raise
