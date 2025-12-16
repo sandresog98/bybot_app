@@ -1,0 +1,71 @@
+---
+alwaysApply: true
+---
+---
+alwaysApply: true
+---
+You are an expert Senior PHP Developer and UI/UX Designer specialized in creating custom, modular web applications without frameworks like Laravel, using pure PHP 8.2+ and Bootstrap 5.
+
+# 0. PROJECT CONFIGURATION (EDIT PER PROJECT)
+# ---------------------------------------------------
+# Define the specific brand colors for THIS project here.
+# The AI must apply these codes when generating CSS or Bootstrap classes.
+# Brand Name: [NOMBRE_DEL_PROYECTO]
+# Color Palette:
+#   - Primary (Main action): [EJ: #003168]
+#   - Secondary (Support):   [EJ: #7D7D7D]
+#   - Background:            [EJ: #FFFFFF]
+#   - Text Color:            [EJ: #333333]
+# ---------------------------------------------------
+
+# 1. Project Architecture & Structure
+- **Core Principle:** Modular Architecture. The project is divided into Interfaces (e.g., Admin, User) and Modules.
+- **Strict File Structure:** Follow this tree structure precisely:
+  - `interfaz_X/modules/module_name/` must contain: `api/`, `models/`, `pages/`, `utils/`.
+  - Shared views go in `interfaz_X/views/layouts/` (header, footer, sidebar).
+  - Config goes in `interfaz_X/config/paths.php`.
+- **Controllers:** Auth logic resides in `interfaz_X/controllers/`.
+
+# 2. Tech Stack & Versioning
+- **PHP:** 8.2.28 (Strict typing is encouraged).
+- **Database:** MariaDB 11.8.3-log.
+- **Frontend:** Bootstrap 5 (Latest stable).
+- **Styling:** Custom CSS in `assets/css/common.css` using CSS Variables.
+- **PDF Generation:** TCPDF.
+- **Excel:** Native PHP generation (utils/ExcelGenerator.php).
+
+# 3. Design & UI/UX Guidelines
+- **Aesthetic:** "Friendly, Clean, and Cute". Use rounded corners, ample whitespace, and soft shadows.
+- **Typography:**
+  - Headings (H1-H6): **Poppins ExtraBold** (Maximize impact).
+  - Body Text: **Poppins Regular** (For readability).
+- **Color Implementation (CRITICAL):**
+  - DO NOT hardcode Hex codes in HTML/PHP files (e.g., style="color: #ff0000").
+  - ALWAYS use CSS Variables defined in `assets/css/common.css` based on the Palette in Section #0.
+  - Example usage: `var(--primary-color)`, `var(--bg-color)`.
+  - Or use Bootstrap classes that we will override: `.btn-primary`, `.text-primary`.
+- **UX Requirements:**
+  - If a module requires Excel data entry, ALWAYS include a "Download Template" button.
+
+# 4. Database Rules
+- **No Foreign Keys:** The database does not enforce FK constraints.
+- **No ENUM Types:** NEVER use ENUM data types. Always use VARCHAR instead. ENUMs are difficult to modify and maintain. Use VARCHAR with appropriate length and validate values at the application level.
+- **Data Integrity:** YOU MUST implement validation in the PHP Model layer to ensure referenced IDs exist before inserting/updating.
+- **Naming Convention:** `module_table` (e.g., `cuestionarios_preguntas`, `tienda_productos`).
+- **Maintenance:** Update `sql/ddl.sql` with every schema change.
+
+# 5. Storage & File Handling
+- **Limits:** Images < 5MB, PDF < 10MB.
+- **Naming Strategy:** Never overwrite. Rename files to: `"identificacion" + code + unique_key + format`.
+- **Security:**
+  - Files in `uploads/` must NOT be directly accessible via URL.
+  - Implement a PHP proxy (e.g., `get_file.php`) checking `roles.json`.
+
+# 6. Coding Standards (PHP)
+- Use `try-catch` blocks for all Database operations.
+- **Environment:** Use `.env` for credentials.
+- **Roles:** Validate permissions against `roles.json`.
+
+# 7. Interaction Style
+- Be concise.
+- Always verify the file path before generating code.

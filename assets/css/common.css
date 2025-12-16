@@ -1,0 +1,468 @@
+/**
+ * Estilos comunes para ByBot App
+ * Variables CSS y estilos compartidos para el panel de administración
+ * Colores corporativos: Azul #003168, Gris #7D7D7D
+ */
+
+:root {
+    --primary-color: #003168;
+    --primary-color-light: #004a8f;
+    --primary-color-dark: #002147;
+    --secondary-color: #7D7D7D;
+    --secondary-color-light: #9d9d9d;
+    --secondary-color-dark: #5d5d5d;
+    --bg-color: #FFFFFF;
+    --text-color: #333333;
+    --bg-light: #f8f9fa;
+    --border-color: #e9ecef;
+    --success-color: #28a745;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --info-color: #17a2b8;
+}
+
+* {
+    font-family: 'Poppins', sans-serif;
+}
+
+body {
+    background-color: var(--bg-light);
+    overflow-x: hidden;
+    color: var(--text-color);
+}
+
+/* Sidebar */
+.sidebar {
+    background: linear-gradient(180deg, var(--primary-color) 0%, var(--primary-color-dark) 100%);
+    min-height: 100vh;
+    height: 100vh;
+    color: white;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1000;
+    overflow-y: auto;
+    width: 260px;
+    box-shadow: 4px 0 20px rgba(0,0,0,0.15);
+}
+
+.sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.1);
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.3);
+    border-radius: 3px;
+}
+
+.sidebar .brand-area {
+    padding: 25px 20px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.sidebar .brand-area .logo-container {
+    background: white;
+    border-radius: 12px;
+    padding: 12px 18px;
+    display: inline-block;
+    text-align: center;
+}
+
+.sidebar .brand-area .logo-container .logo-image {
+    display: block;
+    margin: 0 auto;
+}
+
+.sidebar .brand-area h2 {
+    font-weight: 800;
+    font-size: 1.8rem;
+    margin: 0;
+    color: var(--bg-color);
+    text-transform: uppercase;
+    letter-spacing: 3px;
+}
+
+.sidebar .nav-link {
+    color: rgba(255, 255, 255, 0.75);
+    transition: all 0.3s ease;
+    padding: 12px 20px;
+    margin: 2px 10px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.sidebar .nav-link:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateX(5px);
+}
+
+.sidebar .nav-link.active {
+    color: white;
+    background: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.sidebar .nav-link i {
+    width: 24px;
+    text-align: center;
+}
+
+.sidebar .collapse .nav-link {
+    padding-left: 30px;
+    font-size: 0.85rem;
+}
+
+.main-content {
+    background-color: var(--bg-light);
+    min-height: 100vh;
+    padding: 25px 30px;
+    margin-left: 260px;
+    width: calc(100% - 260px);
+    box-sizing: border-box;
+}
+
+/* Sidebar Overlay para móviles */
+.sidebar-overlay {
+    visibility: hidden;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.sidebar-overlay.active {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Botón hamburguesa para móviles */
+.mobile-menu-toggle {
+    display: none;
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 1001;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 15px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+}
+
+.mobile-menu-toggle:hover {
+    background: var(--primary-color-light);
+    transform: scale(1.05);
+}
+
+/* Botón cerrar en sidebar móvil */
+.sidebar-close-btn {
+    display: none;
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 1002;
+}
+
+.sidebar-close-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: rotate(90deg);
+}
+
+/* Media queries para móviles */
+@media (max-width: 991.98px) {
+    .mobile-menu-toggle {
+        display: block;
+    }
+    
+    .sidebar {
+        position: fixed;
+        left: -280px;
+        top: 0;
+        width: 280px;
+        height: 100vh;
+        transition: left 0.3s ease;
+        z-index: 1000;
+        box-shadow: 4px 0 30px rgba(0, 0, 0, 0.3);
+    }
+    
+    .sidebar.active {
+        left: 0;
+    }
+    
+    .sidebar-close-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .main-content {
+        margin-left: 0;
+        width: 100%;
+        padding: 70px 15px 20px;
+    }
+    
+    .sidebar .brand-area {
+        padding: 20px 15px;
+        padding-top: 60px;
+    }
+}
+
+/* Cards */
+.card {
+    border: none;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 49, 104, 0.08);
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 8px 30px rgba(0, 49, 104, 0.12);
+}
+
+.card-header {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-color-light) 100%);
+    color: white;
+    border-radius: 16px 16px 0 0 !important;
+    padding: 18px 24px;
+    font-weight: 600;
+}
+
+/* Buttons */
+.btn-primary {
+    background: var(--primary-color);
+    border: none;
+    font-weight: 600;
+    padding: 10px 24px;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    background: var(--primary-color-light);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 49, 104, 0.35);
+}
+
+.btn-outline-primary {
+    border: 2px solid var(--primary-color);
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.btn-outline-primary:hover {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+}
+
+/* Tables */
+.table {
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.table thead {
+    background: var(--primary-color);
+    color: white;
+}
+
+.table thead th {
+    border: none;
+    padding: 15px 18px;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.table tbody td {
+    padding: 14px 18px;
+    vertical-align: middle;
+    border-color: var(--border-color);
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 49, 104, 0.05);
+}
+
+/* Forms */
+.form-control, .form-select {
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
+    padding: 12px 16px;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 4px rgba(0, 49, 104, 0.15);
+}
+
+/* Alerts */
+.alert {
+    border: none;
+    border-radius: 12px;
+    padding: 16px 20px;
+}
+
+.alert-success {
+    background: rgba(40, 167, 69, 0.1);
+    border-left: 4px solid var(--success-color);
+    color: #155724;
+}
+
+.alert-danger {
+    background: rgba(220, 53, 69, 0.1);
+    border-left: 4px solid var(--danger-color);
+    color: #721c24;
+}
+
+/* Page Title */
+.page-title {
+    color: var(--primary-color);
+    font-weight: 800;
+    font-size: 1.8rem;
+    margin-bottom: 0;
+}
+
+/* Stat Cards */
+.stat-card {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.stat-card .stat-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 15px;
+    font-size: 1.5rem;
+    background: var(--primary-color);
+    color: white;
+}
+
+.stat-card .stat-number {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--primary-color);
+}
+
+.stat-card .stat-label {
+    color: var(--secondary-color);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+/* User Welcome */
+.user-welcome {
+    background: rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 15px;
+    margin: 20px 10px;
+    text-align: center;
+}
+
+.user-welcome .user-name {
+    font-weight: 600;
+    color: white;
+    font-size: 0.95rem;
+}
+
+.user-welcome .user-role {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Login Page */
+.login-page {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-color-dark) 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.login-container {
+    width: 100%;
+    max-width: 450px;
+}
+
+.login-card {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+}
+
+.login-header {
+    background: white;
+    padding: 30px;
+    text-align: center;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.login-header .logo-container {
+    background: transparent;
+}
+
+.login-header .logo-container p {
+    color: var(--secondary-color) !important;
+}
+
+.login-body {
+    padding: 40px;
+}
+
+.btn-login {
+    background: var(--primary-color);
+    color: white;
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    font-weight: 600;
+    border: none;
+    transition: all 0.3s ease;
+}
+
+.btn-login:hover {
+    background: var(--primary-color-light);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 49, 104, 0.35);
+}
+

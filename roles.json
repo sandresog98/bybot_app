@@ -1,0 +1,28 @@
+{
+    "roles": {
+        "admin": {
+            "descripcion": "Administrador con acceso total",
+            "modulos": ["*"]
+        },
+        "operador": {
+            "descripcion": "Operador que puede crear y gestionar procesos",
+            "modulos": [
+                "crear_coop",
+                "crear_coop.procesos",
+                "crear_coop.crear"
+            ]
+        },
+        "supervisor": {
+            "descripcion": "Supervisor con acceso a logs y usuarios",
+            "modulos": [
+                "crear_coop",
+                "crear_coop.procesos",
+                "usuarios",
+                "usuarios.gestion",
+                "logs",
+                "logs.ver"
+            ]
+        }
+    }
+}
+

@@ -1,0 +1,58 @@
+# Archivos de entorno
+.env
+.env.local
+.env.*.local
+.cursor/
+
+# Archivos subidos (no versionar)
+uploads/
+!uploads/.gitkeep
+
+# Logs
+*.log
+logs/
+bot/logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+bot/venv/
+bot/env/
+bot/.venv
+*.egg-info/
+dist/
+build/
+
+# Archivos temporales
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Base de datos (si hay dumps)
+*.sql.backup
+*.sql.bak
+
+# Archivos de configuración local
+config/local.php
+config/local_config.php
+
+# Archivos de sesión
+sessions/
+
+# Cache
+cache/
+*.cache
+
