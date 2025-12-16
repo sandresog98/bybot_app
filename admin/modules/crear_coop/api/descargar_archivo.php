@@ -161,10 +161,10 @@ if (!$uploadsBase) {
     if (!$uploadsBaseReal || strpos($archivoReal, $uploadsBaseReal) !== 0) {
         // Log para debugging
         error_log("Acceso denegado - Archivo: $archivoReal, Base esperada: $uploadsBaseReal");
-        ob_end_clean();
-        http_response_code(403);
-        echo 'Acceso denegado';
-        exit;
+    ob_end_clean();
+    http_response_code(403);
+    echo 'Acceso denegado';
+    exit;
     }
 }
 

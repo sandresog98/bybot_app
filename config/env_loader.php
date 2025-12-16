@@ -10,9 +10,28 @@ $GLOBALS['_BY_BOT_ENV'] = [];
  * Carga variables de entorno desde archivo .env
  */
 function loadEnv() {
-    $envFile = __DIR__ . '/../.env';
+    // Buscar .env en la raíz del proyecto (igual que database.php)
+    // Primero intentar desde DOCUMENT_ROOT (producción)
+    // Luego desde la raíz relativa al config (desarrollo)
+    $envFile = null;
     
-    if (!file_exists($envFile)) {
+    // 1. DOCUMENT_ROOT/.env (producción - donde está realmente)
+    if (isset($_SERVER['DOCUMENT_ROOT'])) {
+        $docRootEnv = $_SERVER['DOCUMENT_ROOT'] . '/.env';
+        if (file_exists($docRootEnv) && is_readable($docRootEnv)) {
+            $envFile = $docRootEnv;
+        }
+    }
+    
+    // 2. __DIR__/../.env (desarrollo - relativo a config/)
+    if (!$envFile) {
+        $relativeEnv = __DIR__ . '/../.env';
+        if (file_exists($relativeEnv) && is_readable($relativeEnv)) {
+            $envFile = $relativeEnv;
+        }
+    }
+    
+    if (!$envFile) {
         return;
     }
     
