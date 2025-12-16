@@ -24,8 +24,10 @@ $estados = [
     'creado' => ['label' => 'Creado', 'class' => 'bg-secondary'],
     'analizando_con_ia' => ['label' => 'Analizando con IA', 'class' => 'bg-info'],
     'analizado_con_ia' => ['label' => 'Analizado con IA', 'class' => 'bg-primary'],
+    'informacion_ia_validada' => ['label' => 'Información IA Validada', 'class' => 'bg-success'],
     'archivos_extraidos' => ['label' => 'Archivos Extraídos', 'class' => 'bg-warning text-dark'],
-    'llenar_pagare' => ['label' => 'Llenar Pagaré', 'class' => 'bg-success']
+    'llenar_pagare' => ['label' => 'Llenar Pagaré', 'class' => 'bg-success'],
+    'error_analisis' => ['label' => 'Error Análisis', 'class' => 'bg-danger']
 ];
 
 $pageTitle = 'Procesos - Crear Coop';
