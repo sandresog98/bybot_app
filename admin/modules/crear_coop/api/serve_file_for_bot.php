@@ -30,13 +30,17 @@ if (empty($apiToken)) {
     exit;
 }
 
-// Intentar obtener token desde múltiples fuentes
-$expectedToken = getenv('BOT_API_TOKEN');
-if (empty($expectedToken)) {
-    $expectedToken = $_ENV['BOT_API_TOKEN'] ?? $_SERVER['BOT_API_TOKEN'] ?? '';
-}
-if (empty($expectedToken) && isset($GLOBALS['_BY_BOT_ENV']['BOT_API_TOKEN'])) {
+// Obtener token esperado usando la función env() que busca en todas las fuentes
+// Orden de búsqueda: $GLOBALS['_BY_BOT_ENV'], $_ENV, $_SERVER, getenv()
+$expectedToken = '';
+if (isset($GLOBALS['_BY_BOT_ENV']['BOT_API_TOKEN'])) {
     $expectedToken = $GLOBALS['_BY_BOT_ENV']['BOT_API_TOKEN'];
+} elseif (isset($_ENV['BOT_API_TOKEN'])) {
+    $expectedToken = $_ENV['BOT_API_TOKEN'];
+} elseif (isset($_SERVER['BOT_API_TOKEN'])) {
+    $expectedToken = $_SERVER['BOT_API_TOKEN'];
+} else {
+    $expectedToken = getenv('BOT_API_TOKEN') ?: '';
 }
 
 // Limpiar token esperado (eliminar espacios y saltos de línea)
