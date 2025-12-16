@@ -643,6 +643,20 @@ class CrearCoop {
             return [];
         }
     }
+    
+    /**
+     * Obtener un anexo por su ID
+     */
+    public function obtenerAnexoPorId($anexoId) {
+        try {
+            $stmt = $this->conn->prepare("SELECT * FROM crear_coop_anexos WHERE id = ?");
+            $stmt->execute([$anexoId]);
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log('CrearCoop::obtenerAnexoPorId error: ' . $e->getMessage());
+            return false;
+        }
+    }
 }
 ?>
 
