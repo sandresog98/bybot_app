@@ -8,8 +8,15 @@ require_once dirname(__DIR__, 2) . '/utils/session.php';
 requireAuth();
 
 $user = getCurrentUser();
+if (!$user) {
+    // Si no hay usuario, redirigir al login
+    header('Location: ' . adminUrl('login.php'));
+    exit;
+}
 $pageTitle = $pageTitle ?? 'Panel Administrativo';
 $pageDescription = $pageDescription ?? '';
+$userNombre = $user['nombre_completo'] ?? $user['usuario'] ?? 'Usuario';
+$userRol = $user['rol'] ?? 'operador';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -247,11 +254,11 @@ $pageDescription = $pageDescription ?? '';
                 <div class="dropdown">
                     <button class="btn btn-link d-flex align-items-center gap-2 text-decoration-none" data-bs-toggle="dropdown">
                         <div class="user-info d-none d-md-block">
-                            <div class="user-name"><?= htmlspecialchars($user['nombre_completo']) ?></div>
-                            <div class="user-role"><?= ucfirst($user['rol']) ?></div>
+                            <div class="user-name"><?= htmlspecialchars($userNombre) ?></div>
+                            <div class="user-role"><?= ucfirst($userRol) ?></div>
                         </div>
                         <div class="avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
-                            <?= strtoupper(substr($user['nombre_completo'], 0, 1)) ?>
+                            <?= strtoupper(substr($userNombre, 0, 1)) ?>
                         </div>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">

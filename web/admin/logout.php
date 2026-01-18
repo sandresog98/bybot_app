@@ -39,6 +39,6 @@ if (ini_get("session.use_cookies")) {
 session_destroy();
 
 // Redirigir al login
-header("Location: login.php");
-exit;
+require_once __DIR__ . '/utils/session.php';
+redirect('login.php');
 

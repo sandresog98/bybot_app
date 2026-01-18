@@ -28,8 +28,16 @@ if (defined('APP_URL') && !empty(APP_URL)) {
     
     // Extraer rutas relativas desde la raíz del proyecto
     // adminBasePath ejemplo: /projects/bybot/web/admin -> necesitamos /web/admin
+    // O en producción: /web/admin -> necesitamos /web/admin
     $projectBasePath = dirname(dirname($adminBasePath)); // Raíz del proyecto
-    $relativeAdminPath = str_replace($projectBasePath, '', $adminBasePath); // /web/admin o web/admin
+    
+    // Si projectBasePath es /, entonces relativeAdminPath es el adminBasePath completo
+    if ($projectBasePath === '/' || $projectBasePath === '\\' || empty($projectBasePath)) {
+        $relativeAdminPath = $adminBasePath;
+    } else {
+        $relativeAdminPath = str_replace($projectBasePath, '', $adminBasePath);
+    }
+    
     // Asegurar que empiece con /
     if (!empty($relativeAdminPath) && $relativeAdminPath[0] !== '/') {
         $relativeAdminPath = '/' . $relativeAdminPath;
@@ -59,8 +67,14 @@ if (defined('APP_URL') && !empty(APP_URL)) {
 function adminUrl(string $path = ''): string {
     $url = ADMIN_URL;
     if (!empty($path)) {
-        // Asegurar que ADMIN_URL termine con / y path no empiece con /
-        $url = rtrim($url, '/') . '/' . ltrim($path, '/');
+        // Si el path ya contiene query string, no agregar barra adicional
+        if (strpos($path, '?') !== false) {
+            // Path con query string: index.php?page=procesos
+            $url = rtrim($url, '/') . '/' . ltrim($path, '/');
+        } else {
+            // Path normal: index.php
+            $url = rtrim($url, '/') . '/' . ltrim($path, '/');
+        }
     }
     return $url;
 }
