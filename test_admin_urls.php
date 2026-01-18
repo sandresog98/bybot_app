@@ -39,7 +39,15 @@ try {
         echo "<p style='color:green;font-weight:bold'>✅ URLs correctas</p>";
     } else {
         echo "<p style='color:red;font-weight:bold'>❌ URLs incorrectas</p>";
+        echo "<p><strong>Diferencia:</strong> La URL generada no coincide con la esperada.</p>";
     }
+    
+    // Información de debug
+    echo "<h3>Debug - Paths calculados:</h3>";
+    echo "<ul>";
+    echo "<li><strong>ADMIN_DIR:</strong> " . ADMIN_DIR . "</li>";
+    echo "<li><strong>Project Root (calculado):</strong> " . dirname(dirname(dirname(__DIR__ . '/web/admin/config'))) . "</li>";
+    echo "</ul>";
     
 } catch (Exception $e) {
     echo "<p style='color:red'>❌ Error: " . $e->getMessage() . "</p>";

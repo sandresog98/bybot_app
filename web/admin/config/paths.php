@@ -13,10 +13,17 @@ define('ADMIN_LAYOUTS', ADMIN_VIEWS . '/layouts');
 define('ADMIN_PAGES', ADMIN_DIR . '/pages');
 define('ADMIN_MODULES', dirname(__DIR__) . '/modules');
 
-// Detectar paths base automáticamente desde el script actual
-// Ejemplo: /projects/bybot/web/admin/index.php -> /projects/bybot/web/admin
-$adminScriptPath = dirname($_SERVER['SCRIPT_NAME'] ?? '/');
-$adminBasePath = rtrim($adminScriptPath, '/');
+// Calcular path relativo del admin desde la raíz del proyecto
+// ADMIN_DIR es la ruta absoluta del sistema de archivos: /opt/lampp/htdocs/projects/bybot_v1/web/admin
+// Necesitamos el path relativo desde la raíz web: /web/admin
+// BYBOT_ROOT ya está definido en constants.php como la raíz del proyecto
+$adminDirRelative = str_replace(BYBOT_ROOT, '', ADMIN_DIR); // /web/admin
+// Normalizar separadores de directorio
+$adminDirRelative = str_replace('\\', '/', $adminDirRelative);
+// Asegurar que empiece con /
+if (!empty($adminDirRelative) && $adminDirRelative[0] !== '/') {
+    $adminDirRelative = '/' . $adminDirRelative;
+}
 
 // Construir URLs usando APP_URL si está disponible, sino usar detección automática
 if (defined('APP_URL') && !empty(APP_URL)) {
@@ -26,23 +33,9 @@ if (defined('APP_URL') && !empty(APP_URL)) {
     $host = $appUrlParts['host'] ?? 'localhost';
     $appBasePath = rtrim($appUrlParts['path'] ?? '', '/');
     
-    // Extraer rutas relativas desde la raíz del proyecto
-    // adminBasePath ejemplo: /projects/bybot/web/admin -> necesitamos /web/admin
-    // O en producción: /web/admin -> necesitamos /web/admin
-    $projectBasePath = dirname(dirname($adminBasePath)); // Raíz del proyecto
-    
-    // Si projectBasePath es /, entonces relativeAdminPath es el adminBasePath completo
-    if ($projectBasePath === '/' || $projectBasePath === '\\' || empty($projectBasePath)) {
-        $relativeAdminPath = $adminBasePath;
-    } else {
-        $relativeAdminPath = str_replace($projectBasePath, '', $adminBasePath);
-    }
-    
-    // Asegurar que empiece con /
-    if (!empty($relativeAdminPath) && $relativeAdminPath[0] !== '/') {
-        $relativeAdminPath = '/' . $relativeAdminPath;
-    }
-    $relativeApiPath = dirname($relativeAdminPath) . '/api/v1'; // /web/api/v1
+    // Construir paths relativos desde la raíz web
+    $relativeAdminPath = $adminDirRelative; // /web/admin
+    $relativeApiPath = dirname($adminDirRelative) . '/api/v1'; // /web/api/v1
     $relativeAssetsPath = '/assets'; // Siempre /assets desde la raíz del proyecto
     
     // Construir URLs completas
@@ -55,10 +48,10 @@ if (defined('APP_URL') && !empty(APP_URL)) {
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
     
-    $projectBasePath = dirname(dirname($adminBasePath)); // Raíz del proyecto
-    define('ADMIN_URL', $protocol . "://" . $host . $adminBasePath);
-    define('API_URL', $protocol . "://" . $host . dirname($adminBasePath) . '/api/v1');
-    define('ASSETS_URL', $protocol . "://" . $host . $projectBasePath . '/assets');
+    // Usar el path relativo calculado
+    define('ADMIN_URL', $protocol . "://" . $host . $adminDirRelative);
+    define('API_URL', $protocol . "://" . $host . dirname($adminDirRelative) . '/api/v1');
+    define('ASSETS_URL', $protocol . "://" . $host . '/assets');
 }
 
 /**
