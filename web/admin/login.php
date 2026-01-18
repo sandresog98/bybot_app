@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if (!$user) {
                 $error = 'Usuario o contraseña incorrectos';
-            } elseif (!$user['estado_activo']) {
+            } elseif ((int)$user['estado_activo'] !== 1) {
                 $error = 'Tu cuenta ha sido desactivada. Contacta al administrador.';
             } elseif (!password_verify($password, $user['password'])) {
                 $error = 'Usuario o contraseña incorrectos';
@@ -56,27 +56,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['login_time'] = time();
                 $_SESSION['ip'] = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
                 
-                // Actualizar último acceso
-                $updateStmt = $db->prepare("UPDATE control_usuarios SET ultimo_acceso = NOW() WHERE id = ?");
-                $updateStmt->execute([$user['id']]);
+                // Actualizar último acceso (no crítico si falla)
+                try {
+                    $updateStmt = $db->prepare("UPDATE control_usuarios SET ultimo_acceso = NOW() WHERE id = ?");
+                    $updateStmt->execute([$user['id']]);
+                } catch (Exception $e) {
+                    error_log("Error al actualizar último acceso: " . $e->getMessage());
+                }
                 
-                // Registrar log
-                $logStmt = $db->prepare("
-                    INSERT INTO control_logs (id_usuario, accion, modulo, detalle, ip_address, user_agent)
-                    VALUES (?, 'login', 'auth', 'Login exitoso', ?, ?)
-                ");
-                $logStmt->execute([
-                    $user['id'],
-                    $_SERVER['REMOTE_ADDR'] ?? null,
-                    $_SERVER['HTTP_USER_AGENT'] ?? null
-                ]);
+                // Registrar log (no crítico si falla)
+                try {
+                    $logStmt = $db->prepare("
+                        INSERT INTO control_logs (id_usuario, accion, modulo, detalle, ip_address, user_agent)
+                        VALUES (?, 'login', 'auth', 'Login exitoso', ?, ?)
+                    ");
+                    $logStmt->execute([
+                        $user['id'],
+                        $_SERVER['REMOTE_ADDR'] ?? null,
+                        $_SERVER['HTTP_USER_AGENT'] ?? null
+                    ]);
+                } catch (Exception $e) {
+                    error_log("Error al insertar log: " . $e->getMessage());
+                }
                 
-                redirect('index.php');
+                // Redirigir al dashboard
+                try {
+                    redirect('index.php');
+                } catch (Exception $e) {
+                    error_log("Error en redirect: " . $e->getMessage());
+                    // Fallback: redirección manual
+                    $redirectUrl = adminUrl('index.php');
+                    header("Location: {$redirectUrl}");
+                    exit;
+                }
             }
             
         } catch (Exception $e) {
             error_log("Error en login: " . $e->getMessage());
-            $error = 'Error al conectar con el servidor. Intente más tarde.';
+            error_log("Stack trace: " . $e->getTraceAsString());
+            if (APP_DEBUG) {
+                $error = 'Error: ' . $e->getMessage();
+            } else {
+                $error = 'Error al conectar con el servidor. Intente más tarde.';
+            }
         }
     }
 }
