@@ -1,0 +1,15 @@
+# Dependencias para el script de análisis
+
+# Google Generative AI (Gemini)
+google-generativeai>=0.3.0
+
+# HTTP requests
+requests>=2.28.0
+
+# Utilidades
+python-dotenv>=1.0.0
+num2words>=0.5.12
+
+# PDF processing (opcional, para preprocesamiento)
+PyMuPDF>=1.23.0
+

@@ -1,281 +1,470 @@
-# ByBot - Sistema de Gestión Jurídica
+# 🤖 ByBot v2.0
 
-Sistema especializado para automatizar procesos manuales relacionados con la creación de pagarés y demandas, específicamente el módulo CoreCoop.
+Sistema de procesamiento automático de documentos con IA para análisis y llenado de pagarés.
 
-## Características
+---
 
-- **Interfaz Administrativa**: Gestión completa de usuarios, logs y procesos
-- **Módulo Crear Coop**: Procesamiento de documentos (pagarés, estados de cuenta, anexos)
-- **Análisis con IA**: Integración con Gemini para extracción de información de documentos
-- **Validación de Datos**: Interfaz para validar y editar datos extraídos por IA
-- **Gestión de Estados**: Seguimiento del estado de cada proceso (creado, analizando, analizado, etc.)
-- **Visualización de Archivos**: Ver y descargar documentos PDF directamente desde la interfaz
+## 📋 Tabla de Contenidos
 
-## Estructura del Proyecto
+1. [Descripción General](#descripción-general)
+2. [Arquitectura](#arquitectura)
+3. [Estructura del Proyecto](#estructura-del-proyecto)
+4. [Requisitos](#requisitos)
+5. [Instalación](#instalación)
+6. [Configuración](#configuración)
+7. [Uso](#uso)
+8. [API Reference](#api-reference)
+9. [Estado del Desarrollo](#estado-del-desarrollo)
+10. [Documentación Adicional](#documentación-adicional)
+
+---
+
+## 📖 Descripción General
+
+ByBot es un sistema que automatiza el procesamiento de documentos financieros:
+
+1. **Recibe documentos** (estados de cuenta, anexos, solicitudes)
+2. **Analiza con IA** (Google Gemini) para extraer datos
+3. **Permite validación** humana de los datos extraídos
+4. **Llena pagarés** automáticamente con los datos validados
+
+### Características Principales
+
+- ✅ Panel administrativo con Bootstrap
+- ✅ API REST para integraciones
+- ✅ Análisis de documentos con Gemini AI
+- ✅ Llenado automático de PDFs con PyMuPDF
+- ✅ Orquestación con n8n (en VPS separado)
+- ✅ Sistema de roles y permisos
+- ✅ Historial completo de procesos
+
+---
+
+## 🏗️ Arquitectura
 
 ```
-by_bot_app/
-├── admin/                    # Interfaz administrativa (PHP)
-│   ├── controllers/          # Controladores de autenticación
-│   ├── models/               # Modelos de datos
-│   ├── modules/              # Módulos funcionales
-│   │   ├── usuarios/         # Gestión de usuarios
-│   │   ├── logs/             # Visualización de logs
-│   │   └── crear_coop/       # Módulo principal CoreCoop
-│   │       ├── api/          # Endpoints API
-│   │       ├── models/       # Modelos del módulo
-│   │       └── pages/        # Páginas del módulo
-│   ├── pages/                # Páginas principales
-│   ├── views/                # Layouts y vistas
-│   └── utils/                # Utilidades
-├── bot/                      # Bot de análisis con Gemini (Python)
-│   ├── config/               # Configuración
-│   ├── core/                 # Módulos core
-│   │   ├── database.py       # Gestor de BD
-│   │   └── gemini_client.py  # Cliente Gemini
-│   ├── processors/           # Procesadores
-│   │   └── crear_coop_processor.py
-│   ├── logs/                 # Logs del bot
-│   ├── main.py               # Punto de entrada
-│   └── requirements.txt      # Dependencias Python
-├── assets/                   # Recursos estáticos
-│   ├── css/                  # Estilos
-│   ├── images/               # Imágenes (logo, etc.)
-│   └── favicons/             # Iconos
-├── config/                   # Configuración compartida
-├── sql/                      # Scripts SQL
-└── uploads/                   # Archivos subidos
+┌─────────────────────────────────────────────────────────────┐
+│                    HOSTINGER (PHP)                           │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐ │
+│  │  Admin Panel    │  │    REST API     │  │   MariaDB   │ │
+│  │  (Bootstrap)    │  │   (/api/v1/)    │  │  (Datos)    │ │
+│  └────────┬────────┘  └────────┬────────┘  └─────────────┘ │
+│           │                    │                            │
+│           └────────────────────┼────────────────────────────│
+└────────────────────────────────┼────────────────────────────┘
+                                 │ Webhook
+                                 ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    VPS UBUNTU (n8n)                          │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │                    n8n v2.3.2                        │   │
+│  │  ┌──────────────┐  ┌──────────────┐                 │   │
+│  │  │Flujo Análisis│  │Flujo Llenado │                 │   │
+│  │  └──────┬───────┘  └──────┬───────┘                 │   │
+│  └─────────┼─────────────────┼─────────────────────────┘   │
+│            │                 │                              │
+│            ▼                 ▼                              │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │              Python 3.12.3 Scripts                   │   │
+│  │  ┌─────────────┐      ┌─────────────┐               │   │
+│  │  │ analyzer.py │      │  filler.py  │               │   │
+│  │  │ (Gemini AI) │      │  (PyMuPDF)  │               │   │
+│  │  └─────────────┘      └─────────────┘               │   │
+│  └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Requisitos
+### Flujo de Datos
 
-- PHP 8.2.28+
-- MariaDB 11.8.3+
-- Python 3.12+
-- Bootstrap 5
-- Servidor web (Apache/Nginx)
+```
+1. Usuario crea proceso     →  PHP guarda en BD
+2. Usuario sube archivos    →  PHP guarda en uploads/
+3. Usuario inicia análisis  →  PHP dispara webhook a n8n
+4. n8n ejecuta Python       →  Gemini analiza documentos
+5. n8n envía callback       →  PHP guarda datos IA
+6. Usuario valida datos     →  PHP actualiza BD
+7. Usuario inicia llenado   →  PHP dispara webhook a n8n
+8. n8n ejecuta Python       →  PyMuPDF llena pagaré
+9. n8n envía callback       →  PHP guarda PDF llenado
+10. Usuario descarga pagaré →  Proceso completado
+```
 
-## Instalación
+---
 
-1. Clonar o copiar el proyecto en el directorio web
-2. Crear el archivo `.env` en la raíz del proyecto:
-   ```env
-   DB_HOST=localhost
-   DB_USER=tu_usuario
-   DB_PASS=tu_contraseña
-   DB_NAME=by_bot_app
-   APP_ENV=development
-   GEMINI_API_KEY=tu_api_key
-   ```
-3. Ejecutar el script SQL para crear la base de datos:
-   ```bash
-   mysql -u usuario -p < sql/ddl.sql
-   ```
-4. Configurar permisos de escritura en la carpeta `uploads/`
-5. Acceder a la aplicación: `http://localhost/by_bot_app/admin/`
+## 📁 Estructura del Proyecto
 
-## Credenciales por Defecto
+```
+bybot/
+│
+├── 📁 config/                    # Configuración central
+│   ├── constants.php             # Constantes y clases de estado
+│   ├── database.php              # Conexión PDO a MariaDB
+│   ├── env_loader.php            # Carga de variables .env
+│   └── templates/                # Plantillas de pagaré
+│       └── crearcoop/
+│           └── posiciones.json
+│
+├── 📁 web/                       # Aplicación web principal
+│   │
+│   ├── 📁 admin/                 # Panel administrativo
+│   │   ├── config/paths.php      # Rutas del admin
+│   │   ├── utils/session.php     # Manejo de sesión
+│   │   ├── views/layouts/        # Header, sidebar, footer
+│   │   ├── pages/                # Páginas del admin
+│   │   │   ├── dashboard.php
+│   │   │   ├── procesos/         # CRUD de procesos
+│   │   │   ├── usuarios/         # Gestión de usuarios
+│   │   │   ├── configuracion/    # Config del sistema
+│   │   │   └── logs/             # Visor de logs
+│   │   ├── index.php             # Router principal
+│   │   ├── login.php             # Página de login
+│   │   └── logout.php            # Cerrar sesión
+│   │
+│   ├── 📁 api/                   # API REST
+│   │   ├── index.php             # Entry point de API
+│   │   ├── .htaccess             # Rewrite rules
+│   │   ├── middleware/           # Auth, CORS, rate limit
+│   │   └── v1/                   # Versión 1 de API
+│   │       ├── auth/router.php
+│   │       ├── procesos/router.php
+│   │       ├── archivos/router.php
+│   │       ├── validacion/router.php
+│   │       ├── webhook/          # Callbacks de n8n
+│   │       │   ├── router.php
+│   │       │   └── n8n.php
+│   │       ├── usuarios/router.php
+│   │       ├── colas/router.php
+│   │       ├── stats/router.php
+│   │       └── config/router.php
+│   │
+│   ├── 📁 modules/               # Módulos de negocio
+│   │   └── procesos/
+│   │       ├── models/           # Proceso, Anexo, DatosIA, Historial
+│   │       └── services/         # ProcesoService, ArchivoService
+│   │
+│   └── 📁 core/                  # Clases base
+│       ├── BaseModel.php         # CRUD genérico
+│       ├── BaseService.php       # Lógica de negocio
+│       ├── Response.php          # Respuestas JSON
+│       ├── Validator.php         # Validación de datos
+│       ├── QueueManager.php      # (Legacy) Colas Redis
+│       └── N8nClient.php         # Cliente para webhooks n8n
+│
+├── 📁 n8n/                       # Scripts para VPS
+│   ├── SETUP_VPS.md              # Guía de instalación VPS
+│   ├── flows/                    # Flujos n8n (JSON)
+│   │   ├── flujo_analisis.json
+│   │   ├── flujo_llenado.json
+│   │   └── README.md
+│   └── scripts/                  # Scripts Python
+│       ├── requirements.txt      # Dependencias maestras
+│       ├── env_example.txt       # Template de .env
+│       ├── shared/               # Utilidades comunes
+│       │   ├── config.py
+│       │   └── utils.py
+│       ├── analyzer/             # Análisis con Gemini
+│       │   ├── main.py
+│       │   └── gemini_client.py
+│       └── filler/               # Llenado de PDF
+│           ├── main.py
+│           └── pdf_filler.py
+│
+├── 📁 assets/                    # Recursos estáticos
+│   ├── css/
+│   │   ├── variables.css         # Colores corporativos
+│   │   ├── common.css            # Estilos globales
+│   │   └── admin.css             # Estilos del admin
+│   └── js/
+│       ├── common.js             # JS global
+│       └── admin.js              # JS del admin
+│
+├── 📁 sql/                       # Scripts de BD
+│   ├── ddl.sql                   # Crear tablas
+│   └── reset_db.sql              # Reiniciar BD
+│
+├── 📁 uploads/                   # Archivos subidos
+│   └── .gitkeep
+│
+├── 📁 logs/                      # Logs de aplicación
+│   └── .gitkeep
+│
+├── env_example.txt               # Template de .env (Hostinger)
+├── roles.json                    # Definición de roles
+├── PLAN_DESARROLLO.md            # Plan de desarrollo por fases
+├── PLAN_PRUEBAS.md               # Plan de pruebas detallado
+├── PLAN_REESTRUCTURACION.md      # Análisis inicial del proyecto
+└── README.md                     # Este archivo
+```
 
-- Usuario: `admin`
-- Contraseña: `admin123`
+---
 
-**IMPORTANTE**: Cambiar la contraseña después del primer acceso.
+## 📋 Requisitos
 
-## Módulo Crear Coop
+### Servidor PHP (Hostinger)
+- PHP 8.2+
+- MariaDB 11.8+
+- Extensiones: pdo_mysql, curl, json, fileinfo
+- mod_rewrite habilitado
 
-### Estados del Proceso
+### Servidor VPS (n8n)
+- Ubuntu 20.04+
+- n8n 2.3.2
+- Python 3.12.3
+- Librerías: google-generativeai, PyMuPDF, requests
 
-1. **creado**: Proceso recién creado, archivos cargados
-2. **analizando_con_ia**: El proceso Python está analizando los documentos
-3. **analizado_con_ia**: Análisis completado, datos extraídos
-4. **informacion_ia_validada**: Datos validados y editados por el usuario
-5. **archivos_extraidos**: Archivos relevantes extraídos de los anexos
-6. **llenar_pagare**: Listo para llenar el pagaré
+### Desarrollo Local
+- XAMPP/WAMP/MAMP con PHP 8.2+
+- Composer (opcional)
 
-### Archivos Requeridos
+---
 
-- **Pagaré**: PDF del pagaré original (máx. 10MB)
-- **Estado de Cuenta**: PDF del estado de cuenta (máx. 10MB)
-- **Anexos**: Mínimo 1, máximo 5 archivos PDF (máx. 10MB cada uno)
+## 🚀 Instalación
 
-### Información Extraída por IA
+### 1. Clonar/Copiar el Proyecto
 
-**Del Estado de Cuenta:**
-- Fecha causación (última fecha de pago)
-- Saldo capital
-- Saldo interés
-- Saldo mora
-- Tasa interés efectiva anual (TEA)
-
-**De los Anexos:**
-- **Deudor/Solicitante**: Tipo y número de identificación, nombres, apellidos, fechas, teléfono, dirección, correo
-- **Codeudor**: Misma información que deudor
-
-### Validación de Datos
-
-El sistema permite:
-- Ver los valores originales extraídos por IA
-- Editar campos individuales por sección (Estado de Cuenta, Deudor, Codeudor)
-- Ver qué campos fueron editados
-- Guardar cambios sin cambiar el estado
-- Marcar como "Información IA Validada" cuando todos los datos estén correctos
-
-## Integración con Python (Bot)
-
-El sistema incluye un bot Python (`bot/`) que:
-- Consulta procesos en estado "creado" en la base de datos cada 30 segundos
-- Utiliza Gemini API para analizar documentos PDF
-- Extrae información estructurada de estado de cuenta y anexos
-- Guarda los datos en formato JSON en la tabla `crear_coop_datos_ia`
-- Actualiza el estado del proceso automáticamente
-- Se ejecuta como servicio continuo
-
-### Configuración del Bot
-
-1. Instalar dependencias:
 ```bash
-cd bot/
-pip install -r requirements.txt
+# En Hostinger o servidor local
+cd /path/to/htdocs
+git clone [repo-url] bybot
+# O copiar archivos manualmente
 ```
 
-2. Configurar API Key de Gemini en `.env`:
+### 2. Configurar Variables de Entorno
+
+```bash
+cd bybot
+cp env_example.txt .env
+nano .env  # Editar con tus valores
+```
+
+### 3. Crear Base de Datos
+
+```sql
+CREATE DATABASE bybot CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+```bash
+# Ejecutar DDL
+mysql -u usuario -p bybot < sql/ddl.sql
+```
+
+### 4. Insertar Usuario Admin
+
+```sql
+INSERT INTO control_usuarios (nombre, email, password, rol, activo) 
+VALUES (
+    'Administrador',
+    'admin@tudominio.com',
+    '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
+    'admin',
+    1
+);
+-- Password: admin123
+```
+
+### 5. Configurar VPS (Ver SETUP_VPS.md)
+
+```bash
+# En el VPS
+mkdir -p /opt/bybot/scripts
+# Copiar contenido de n8n/scripts/
+# Instalar dependencias Python
+# Importar flujos en n8n
+```
+
+---
+
+## ⚙️ Configuración
+
+### Variables de Entorno Principales (.env)
+
 ```env
-GEMINI_API_KEY=tu_api_key_aqui
+# Aplicación
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://bybjuridicos.andapps.cloud
+
+# Base de Datos
+DB_HOST=localhost
+DB_NAME=bybot
+DB_USER=usuario
+DB_PASS=password
+
+# n8n
+N8N_WEBHOOK_URL=https://n8n.srv1083920.hstgr.cloud/webhook
+WORKER_API_TOKEN=token_seguro_compartido
+
+# Gemini (referencia, se usa en VPS)
+GEMINI_API_KEY=tu_api_key
 ```
 
-3. Probar conexión:
-```bash
-python3 test_connection.py
-```
+### Roles de Usuario (roles.json)
 
-4. Ejecutar bot:
-```bash
-python3 main.py
-# o
-./start.sh
-```
-
-### Flujo de Trabajo del Bot
-
-```
-1. Usuario crea proceso en admin/
-   └─> Estado: "creado"
-   
-2. Bot consulta procesos en estado "creado"
-   └─> Cambia estado a: "analizando_con_ia"
-   
-3. Bot analiza documentos con Gemini:
-   ├─> Estado de Cuenta → Extrae datos financieros
-   └─> Anexos → Extrae datos de deudor y codeudor
-   
-4. Bot guarda datos en crear_coop_datos_ia (JSON)
-   └─> Cambia estado a: "analizado_con_ia"
-```
-
-## Arquitectura de Datos de IA
-
-### Estructura de Tablas
-
-#### `crear_coop_procesos` (Tabla Principal)
-- Solo campos esenciales del proceso
-- Código, estado, archivos
-- Metadata básica (fechas, creado_por, intentos)
-- **NO contiene datos extraídos por IA**
-
-#### `crear_coop_datos_ia` (Tabla de Datos de IA)
-- Almacena todos los datos de IA en formato JSON
-- **Estructura**:
-  - `id`: ID único
-  - `proceso_id`: Referencia al proceso
-  - `datos_originales`: JSON con datos extraídos por IA
-  - `datos_validados`: JSON con datos validados/editados (NULL si no se validaron)
-  - `metadata`: JSON con tokens, modelo usado, etc.
-  - `fecha_analisis`: Cuándo se analizó
-  - `fecha_validacion`: Cuándo se validó
-  - `validado_por`: Usuario que validó
-
-### Ventajas de esta Arquitectura
-
-1. **Escalabilidad**: Agregar nuevos campos no requiere modificar el esquema
-2. **Flexibilidad**: Estructura JSON permite diferentes formatos por proceso
-3. **Historial**: Mantiene datos originales y validados separados
-4. **Performance**: Tabla principal más ligera y rápida
-5. **Mantenibilidad**: Cambios en extracción de IA no afectan estructura
-
-### Estructura del JSON
-
-**`datos_originales`** (lo que extrae la IA):
 ```json
 {
-  "estado_cuenta": {
-    "fecha_causacion": "2024-08-31",
-    "saldo_capital": 3448419.0,
-    "saldo_interes": 716732.0,
-    "saldo_mora": 311307.0,
-    "tasa_interes_efectiva_anual": 15.5
-  },
-  "deudor": {
-    "tipo_identificacion": "CC",
-    "numero_identificacion": "1234567890",
-    "nombres": "Juan",
-    "apellidos": "Pérez",
-    ...
-  },
-  "codeudor": {
-    ...
-  }
+    "admin": ["dashboard", "procesos", "usuarios", "configuracion", "logs"],
+    "supervisor": ["dashboard", "procesos", "logs"],
+    "operador": ["dashboard", "procesos"]
 }
 ```
 
-**`datos_validados`** (lo que el usuario valida/edita):
-- Misma estructura que `datos_originales`
-- Solo contiene los campos que fueron editados
-- Si un campo no está presente, se usa el valor original
+---
 
-**`metadata`** (información del análisis):
-```json
-{
-  "tokens_entrada": 1500,
-  "tokens_salida": 800,
-  "tokens_total": 2300,
-  "modelo": "gemini-2.5-flash-lite",
-  "fecha_analisis": "2025-12-13 18:43:16"
-}
+## 📖 Uso
+
+### Acceso al Panel Administrativo
+
+```
+URL: https://tu-dominio.com/web/admin/
+Usuario: admin@tudominio.com
+Password: admin123 (cambiar después del primer login)
 ```
 
-## Seguridad
+### Flujo de Trabajo Típico
 
-- Los archivos en `uploads/` no son accesibles directamente por URL
-- Se utiliza `descargar_archivo.php` para servir archivos de forma segura
-- Validación de roles y permisos mediante `roles.json`
-- Contraseñas hasheadas con `password_hash()`
-- Autenticación requerida para todas las operaciones
+1. **Login** → Acceder al panel
+2. **Crear Proceso** → Subir documentos (estado de cuenta, anexos)
+3. **Analizar** → El sistema extrae datos con IA
+4. **Validar** → Revisar y corregir datos extraídos
+5. **Llenar Pagaré** → Generar PDF con datos validados
+6. **Descargar** → Obtener pagaré llenado
 
-## Colores Corporativos
+---
 
-- **Azul Principal**: #003168
-- **Gris Secundario**: #7D7D7D
+## 📡 API Reference
 
-## Troubleshooting
+### Autenticación
 
-### El bot no encuentra procesos
-- Verificar que hay procesos en estado "creado"
-- Verificar conexión a BD: `python3 bot/test_connection.py`
+```bash
+# Login
+POST /web/api/v1/auth/login
+Body: { "email": "...", "password": "..." }
 
-### Error con Gemini API
-- Verificar que `GEMINI_API_KEY` está configurada en `.env`
-- Verificar que la API key es válida
-- Revisar límites de cuota en Google AI Studio
+# Usuario actual
+GET /web/api/v1/auth/me
 
-### Archivos no encontrados
-- Verificar rutas en `config/settings.py` (bot)
-- Verificar que los archivos existen en `uploads/crear_coop/`
-- Verificar permisos de lectura
+# Logout
+POST /web/api/v1/auth/logout
+```
 
-### Logs
-- **Bot**: `bot/logs/bot.log`
-- **PHP**: Verificar configuración de errores en PHP
+### Procesos
 
-## Licencia
+```bash
+# Listar
+GET /web/api/v1/procesos?page=1&estado=creado
 
-Proyecto privado - Uso interno
+# Crear
+POST /web/api/v1/procesos
+Body: { "tipo": "cobranza", "prioridad": 5 }
+
+# Obtener
+GET /web/api/v1/procesos/{id}
+
+# Encolar análisis
+POST /web/api/v1/procesos/{id}/encolar-analisis
+
+# Encolar llenado
+POST /web/api/v1/procesos/{id}/encolar-llenado
+```
+
+### Archivos
+
+```bash
+# Subir
+POST /web/api/v1/archivos/subir
+Form: proceso_id, tipo, archivo
+
+# Descargar
+GET /web/api/v1/archivos/{id}
+
+# Servir (para n8n)
+GET /web/api/v1/archivos/servir?id={id}
+Header: X-N8N-Access-Token: {token}
+```
+
+### Webhooks (para n8n)
+
+```bash
+# Resultado de análisis
+POST /web/api/v1/webhook/n8n/analisis
+Header: X-N8N-Access-Token: {token}
+Body: { "proceso_id": 1, "success": true, "datos": {...} }
+
+# Resultado de llenado
+POST /web/api/v1/webhook/n8n/llenado
+Header: X-N8N-Access-Token: {token}
+Body: { "proceso_id": 1, "success": true, "archivo_contenido_base64": "..." }
+```
+
+---
+
+## 📊 Estado del Desarrollo
+
+| Fase | Descripción | Estado |
+|------|-------------|--------|
+| 1 | Fundamentos (config, BD, core) | ✅ Completada |
+| 2 | API REST completa | ✅ Completada |
+| 3 | Panel Administrativo | ✅ Completada |
+| 4 | Integración n8n (PHP) | ✅ Completada |
+| 5 | Scripts Python y Flujos n8n | ✅ Completada |
+| 6 | Pruebas de Integración | ⏳ Pendiente |
+| 7 | Refinamiento y Optimización | ⏳ Pendiente |
+| 8 | Documentación y Deploy | ⏳ Pendiente |
+
+### ⚠️ Estado Actual
+
+**El código está escrito pero NO ha sido probado.** Antes de usar en producción:
+
+1. Seguir el `PLAN_PRUEBAS.md` paso a paso
+2. Corregir errores encontrados
+3. Probar integración completa
+
+---
+
+## 📚 Documentación Adicional
+
+| Archivo | Descripción |
+|---------|-------------|
+| `PLAN_DESARROLLO.md` | Plan detallado de desarrollo por fases |
+| `PLAN_PRUEBAS.md` | Plan de pruebas con tests específicos |
+| `PLAN_REESTRUCTURACION.md` | Análisis inicial y opciones de arquitectura |
+| `n8n/SETUP_VPS.md` | Guía de configuración del VPS |
+| `n8n/flows/README.md` | Documentación de flujos n8n |
+
+---
+
+## 🎨 Colores Corporativos
+
+| Color | Código | Uso |
+|-------|--------|-----|
+| Azul Primario | `#55A5C8` | Color principal |
+| Verde Secundario | `#9AD082` | Acentos y éxito |
+| Gris Terciario | `#B1BCBF` | Fondos y bordes |
+| Azul Oscuro | `#35719E` | Encabezados |
+
+---
+
+## 🔐 Seguridad
+
+- Autenticación basada en sesiones PHP
+- Tokens para comunicación con n8n
+- Archivos en `uploads/` protegidos (requieren autenticación)
+- Validación de roles por módulo
+- Rate limiting en API
+
+---
+
+## 📝 Licencia
+
+Proyecto privado - Todos los derechos reservados.
+
+---
+
+## 👥 Contacto
+
+Para soporte o consultas sobre el proyecto, contactar al administrador del sistema.
+
+---
+
+**Versión:** 2.0  
+**Última actualización:** 2026-01-18

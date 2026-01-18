@@ -1,0 +1,99 @@
+# =============================================
+# BYBOT v2.0 - Variables de Entorno
+# =============================================
+# Renombra este archivo a .env y configura los valores
+
+# =============================================
+# ENTORNO
+# =============================================
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://bybjuridicos.andapps.cloud
+APP_NAME=ByBot
+
+# =============================================
+# BASE DE DATOS (Hostinger)
+# =============================================
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=tu_base_de_datos
+DB_USER=tu_usuario
+DB_PASS=tu_password
+DB_CHARSET=utf8mb4
+
+# =============================================
+# n8n (VPS Ubuntu)
+# =============================================
+# URL base de n8n
+N8N_BASE_URL=https://n8n.srv1083920.hstgr.cloud
+
+# URL de webhooks (normalmente N8N_BASE_URL + /webhook)
+N8N_WEBHOOK_URL=https://n8n.srv1083920.hstgr.cloud/webhook
+
+# API Key de n8n (si usas autenticación)
+N8N_API_KEY=
+
+# Secreto compartido para validar webhooks
+N8N_WEBHOOK_SECRET=genera_un_secreto_seguro
+
+# Token de acceso para n8n
+N8N_ACCESS_TOKEN=genera_un_token_largo_y_seguro
+
+# Timeout para llamadas a n8n (segundos)
+N8N_TIMEOUT=30
+
+# =============================================
+# WORKERS / PROCESAMIENTO
+# =============================================
+# Token que n8n usa para hacer callbacks a PHP
+# Debe ser el mismo que BYBOT_ACCESS_TOKEN en el VPS
+WORKER_API_TOKEN=genera_el_mismo_token_que_usaras_en_vps
+
+# Usar n8n para procesamiento (true) o workers directos (false)
+USE_N8N=true
+
+# Máximo de intentos para análisis y llenado
+MAX_INTENTOS_ANALISIS=3
+MAX_INTENTOS_LLENADO=3
+
+# =============================================
+# GEMINI AI (Solo para referencia, se usa en VPS)
+# =============================================
+GEMINI_API_KEY=tu_api_key_de_google_gemini
+GEMINI_MODEL=gemini-1.5-flash
+GEMINI_TEMPERATURE=0.1
+GEMINI_MAX_TOKENS=4000
+
+# =============================================
+# REDIS (Legacy - No se usa con n8n)
+# =============================================
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
+
+# =============================================
+# WEBSOCKET (Opcional - Fase futura)
+# =============================================
+WEBSOCKET_HOST=localhost
+WEBSOCKET_PORT=8765
+WEBSOCKET_ENABLED=false
+
+# =============================================
+# ARCHIVOS
+# =============================================
+# Tamaño máximo en bytes
+UPLOAD_MAX_SIZE_IMAGE=5242880
+UPLOAD_MAX_SIZE_PDF=10485760
+
+# =============================================
+# API
+# =============================================
+API_TOKEN_SECRET=secreto_para_generar_tokens_jwt
+API_RATE_LIMIT=100
+
+# =============================================
+# LOGS
+# =============================================
+LOG_LEVEL=info
+

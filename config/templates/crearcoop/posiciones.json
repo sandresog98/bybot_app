@@ -1,0 +1,109 @@
+{
+    "nombre": "CrearCoop Pagaré v1",
+    "version": "1.0",
+    "descripcion": "Plantilla para pagarés de CrearCoop",
+    "paginas": 2,
+    "notas": "Las posiciones están en porcentaje del tamaño de la página",
+    "campos": {
+        "capital": {
+            "label": "Capital",
+            "x_percent": 0.42,
+            "y_percent": 0.18,
+            "page": 0,
+            "fontsize": 11,
+            "format": "currency",
+            "color": [0, 0, 0]
+        },
+        "interes_plazo": {
+            "label": "Interés de Plazo",
+            "x_percent": 0.42,
+            "y_percent": 0.21,
+            "page": 0,
+            "fontsize": 11,
+            "format": "currency",
+            "color": [0, 0, 0]
+        },
+        "tasa_interes": {
+            "label": "Tasa de Interés",
+            "x_percent": 0.42,
+            "y_percent": 0.24,
+            "page": 0,
+            "fontsize": 11,
+            "format": "percent",
+            "color": [0, 0, 0]
+        },
+        "fecha_vencimiento": {
+            "label": "Fecha de Vencimiento",
+            "x_percent": 0.42,
+            "y_percent": 0.27,
+            "page": 0,
+            "fontsize": 11,
+            "format": "date",
+            "date_format": "DD/MM/YYYY",
+            "color": [0, 0, 0]
+        },
+        "deudor_nombre": {
+            "label": "Nombre del Deudor",
+            "x_percent": 0.30,
+            "y_percent": 0.32,
+            "page": 0,
+            "fontsize": 11,
+            "format": "text",
+            "color": [0, 0, 0]
+        },
+        "codeudor_nombre": {
+            "label": "Nombre del Codeudor",
+            "x_percent": 0.30,
+            "y_percent": 0.36,
+            "page": 0,
+            "fontsize": 11,
+            "format": "text",
+            "color": [0, 0, 0]
+        },
+        "deudor_cedula": {
+            "label": "Cédula del Deudor",
+            "x_percent": 0.30,
+            "y_percent": 0.40,
+            "page": 0,
+            "fontsize": 11,
+            "format": "text",
+            "color": [0, 0, 0]
+        },
+        "codeudor_cedula": {
+            "label": "Cédula del Codeudor",
+            "x_percent": 0.30,
+            "y_percent": 0.44,
+            "page": 0,
+            "fontsize": 11,
+            "format": "text",
+            "color": [0, 0, 0]
+        },
+        "endoso": {
+            "label": "Texto de Endoso",
+            "x_percent": 0.20,
+            "y_percent": 0.85,
+            "page": 1,
+            "fontsize": 10,
+            "format": "multiline",
+            "texto_fijo": "Endoso en procuración a favor de:\nAndrés Bello Arias T.P. 378.676",
+            "color": [0, 0, 0]
+        }
+    },
+    "formatos": {
+        "currency": {
+            "prefix": "$",
+            "thousands_sep": ".",
+            "decimal_sep": ",",
+            "decimals": 0
+        },
+        "percent": {
+            "suffix": "%",
+            "decimals": 2
+        },
+        "date": {
+            "input_format": "YYYY-MM-DD",
+            "output_format": "DD/MM/YYYY"
+        }
+    }
+}
+

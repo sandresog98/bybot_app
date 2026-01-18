@@ -1,27 +1,198 @@
 {
     "roles": {
         "admin": {
-            "descripcion": "Administrador con acceso total",
-            "modulos": ["*"]
+            "descripcion": "Administrador con acceso total al sistema",
+            "modulos": ["*"],
+            "permisos": {
+                "usuarios": ["ver", "crear", "editar", "eliminar"],
+                "procesos": ["ver", "crear", "editar", "eliminar", "validar", "cancelar", "reanalizar"],
+                "reportes": ["ver", "exportar"],
+                "configuracion": ["ver", "editar"],
+                "colas": ["ver", "gestionar"],
+                "logs": ["ver"]
+            }
+        },
+        "supervisor": {
+            "descripcion": "Supervisor con acceso a gestión y reportes",
+            "modulos": [
+                "dashboard",
+                "procesos",
+                "procesos.lista",
+                "procesos.ver",
+                "procesos.crear",
+                "procesos.editar",
+                "procesos.validar",
+                "reportes",
+                "reportes.ver",
+                "reportes.exportar",
+                "usuarios",
+                "usuarios.ver",
+                "logs",
+                "logs.ver"
+            ],
+            "permisos": {
+                "usuarios": ["ver"],
+                "procesos": ["ver", "crear", "editar", "validar"],
+                "reportes": ["ver", "exportar"],
+                "logs": ["ver"]
+            }
         },
         "operador": {
             "descripcion": "Operador que puede crear y gestionar procesos",
             "modulos": [
-                "crear_coop",
-                "crear_coop.procesos",
-                "crear_coop.crear"
+                "dashboard",
+                "procesos",
+                "procesos.lista",
+                "procesos.ver",
+                "procesos.crear",
+                "procesos.editar",
+                "procesos.validar"
+            ],
+            "permisos": {
+                "procesos": ["ver", "crear", "editar", "validar"]
+            }
+        }
+    },
+    "modulos": {
+        "dashboard": {
+            "nombre": "Dashboard",
+            "icono": "fas fa-tachometer-alt",
+            "ruta": "/admin/pages/dashboard.php",
+            "orden": 1
+        },
+        "procesos": {
+            "nombre": "Procesos",
+            "icono": "fas fa-file-contract",
+            "ruta": "/admin/modules/procesos/pages/lista.php",
+            "orden": 2,
+            "submenu": [
+                {
+                    "id": "procesos.lista",
+                    "nombre": "Lista de Procesos",
+                    "ruta": "/admin/modules/procesos/pages/lista.php"
+                },
+                {
+                    "id": "procesos.crear",
+                    "nombre": "Nuevo Proceso",
+                    "ruta": "/admin/modules/procesos/pages/crear.php"
+                }
             ]
         },
-        "supervisor": {
-            "descripcion": "Supervisor con acceso a logs y usuarios",
-            "modulos": [
-                "crear_coop",
-                "crear_coop.procesos",
-                "usuarios",
-                "usuarios.gestion",
-                "logs",
-                "logs.ver"
+        "reportes": {
+            "nombre": "Reportes",
+            "icono": "fas fa-chart-bar",
+            "ruta": "/admin/modules/reportes/pages/dashboard.php",
+            "orden": 3,
+            "submenu": [
+                {
+                    "id": "reportes.dashboard",
+                    "nombre": "Dashboard",
+                    "ruta": "/admin/modules/reportes/pages/dashboard.php"
+                },
+                {
+                    "id": "reportes.exportar",
+                    "nombre": "Exportar",
+                    "ruta": "/admin/modules/reportes/pages/exportar.php"
+                }
             ]
+        },
+        "usuarios": {
+            "nombre": "Usuarios",
+            "icono": "fas fa-users",
+            "ruta": "/admin/modules/usuarios/pages/lista.php",
+            "orden": 4
+        },
+        "configuracion": {
+            "nombre": "Configuración",
+            "icono": "fas fa-cog",
+            "ruta": "/admin/modules/configuracion/pages/general.php",
+            "orden": 5,
+            "submenu": [
+                {
+                    "id": "configuracion.general",
+                    "nombre": "General",
+                    "ruta": "/admin/modules/configuracion/pages/general.php"
+                },
+                {
+                    "id": "configuracion.prompts",
+                    "nombre": "Prompts IA",
+                    "ruta": "/admin/modules/configuracion/pages/prompts.php"
+                },
+                {
+                    "id": "configuracion.plantillas",
+                    "nombre": "Plantillas Pagaré",
+                    "ruta": "/admin/modules/configuracion/pages/plantillas.php"
+                }
+            ]
+        },
+        "colas": {
+            "nombre": "Colas de Trabajo",
+            "icono": "fas fa-layer-group",
+            "ruta": "/admin/modules/colas/pages/monitor.php",
+            "orden": 6
+        },
+        "logs": {
+            "nombre": "Logs del Sistema",
+            "icono": "fas fa-history",
+            "ruta": "/admin/modules/logs/pages/lista.php",
+            "orden": 7
+        }
+    },
+    "estados_proceso": {
+        "creado": {
+            "label": "Creado",
+            "color": "#6c757d",
+            "descripcion": "Proceso recién creado, pendiente de análisis"
+        },
+        "en_cola_analisis": {
+            "label": "En Cola de Análisis",
+            "color": "#17a2b8",
+            "descripcion": "Esperando ser procesado por el worker de análisis"
+        },
+        "analizando": {
+            "label": "Analizando",
+            "color": "#007bff",
+            "descripcion": "Siendo analizado por IA"
+        },
+        "analizado": {
+            "label": "Analizado",
+            "color": "#0056b3",
+            "descripcion": "Análisis completado, pendiente de validación"
+        },
+        "error_analisis": {
+            "label": "Error en Análisis",
+            "color": "#dc3545",
+            "descripcion": "Error durante el análisis con IA"
+        },
+        "validado": {
+            "label": "Validado",
+            "color": "#28a745",
+            "descripcion": "Datos validados, listo para llenado de pagaré"
+        },
+        "en_cola_llenado": {
+            "label": "En Cola de Llenado",
+            "color": "#ffc107",
+            "descripcion": "Esperando ser procesado por el worker de llenado"
+        },
+        "llenando": {
+            "label": "Llenando Pagaré",
+            "color": "#fd7e14",
+            "descripcion": "Pagaré siendo llenado"
+        },
+        "completado": {
+            "label": "Completado",
+            "color": "#1e7e34",
+            "descripcion": "Proceso completado exitosamente"
+        },
+        "error_llenado": {
+            "label": "Error en Llenado",
+            "color": "#dc3545",
+            "descripcion": "Error durante el llenado del pagaré"
+        },
+        "cancelado": {
+            "label": "Cancelado",
+            "color": "#343a40",
+            "descripcion": "Proceso cancelado por el usuario"
         }
     }
 }

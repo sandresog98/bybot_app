@@ -1,0 +1,34 @@
+# =============================================
+# BYBOT SCRIPTS - Variables de Entorno (VPS)
+# =============================================
+# Renombra este archivo a .env en /opt/bybot/scripts/
+
+# =============================================
+# API DE BYBOT (Hostinger)
+# =============================================
+BYBOT_API_URL=https://bybjuridicos.andapps.cloud/web/api/v1
+
+# Token de acceso para API de PHP
+# Debe ser el mismo que WORKER_API_TOKEN en Hostinger
+BYBOT_ACCESS_TOKEN=el_mismo_token_que_en_hostinger
+
+# =============================================
+# GEMINI AI
+# =============================================
+GEMINI_API_KEY=tu_api_key_de_google_gemini
+GEMINI_MODEL=gemini-1.5-flash
+GEMINI_TEMPERATURE=0.1
+GEMINI_MAX_TOKENS=4000
+
+# =============================================
+# PROCESAMIENTO
+# =============================================
+MAX_FILE_SIZE_MB=10
+TIMEOUT_SECONDS=120
+
+# =============================================
+# LOGGING
+# =============================================
+# Niveles: DEBUG, INFO, WARNING, ERROR, CRITICAL
+LOG_LEVEL=INFO
+

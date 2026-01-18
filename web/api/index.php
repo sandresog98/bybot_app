@@ -1,0 +1,213 @@
+<?php
+/**
+ * Router Principal de la API REST
+ * Punto de entrada para todas las solicitudes /api/v1/*
+ */
+
+// Configuración de errores
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+
+// Cargar configuración base
+require_once dirname(__DIR__, 2) . '/config/constants.php';
+require_once BASE_DIR . '/web/core/Response.php';
+
+// Middleware global
+require_once __DIR__ . '/middleware/cors.php';
+
+// Headers JSON para todas las respuestas
+header('Content-Type: application/json; charset=utf-8');
+
+// Obtener método y path
+$method = $_SERVER['REQUEST_METHOD'];
+$requestUri = $_SERVER['REQUEST_URI'];
+
+// Detectar path base automáticamente desde el script actual
+// Ejemplo: /projects/bybot/web/api/index.php -> /projects/bybot/web/api
+$scriptPath = dirname($_SERVER['SCRIPT_NAME']);
+$basePath = rtrim($scriptPath, '/');
+
+// Extraer path relativo a la base de la API
+$path = str_replace($basePath, '', parse_url($requestUri, PHP_URL_PATH));
+$path = trim($path, '/');
+
+// Parsear segmentos del path
+$segments = $path ? explode('/', $path) : [];
+
+// Obtener versión de API (v1, v2, etc.)
+$version = array_shift($segments) ?? 'v1';
+
+if ($version !== 'v1') {
+    Response::error("Versión de API no soportada: {$version}", [], 400);
+}
+
+// Obtener recurso principal
+$resource = array_shift($segments) ?? '';
+
+// Obtener ID o acción
+$id = array_shift($segments);
+$action = array_shift($segments);
+
+// Obtener body de la solicitud
+$input = file_get_contents('php://input');
+$body = json_decode($input, true) ?? [];
+
+// Agregar datos POST/GET al body si están vacíos
+if (empty($body) && !empty($_POST)) {
+    $body = $_POST;
+}
+
+// Debug info (solo en desarrollo)
+if (APP_ENV === 'development' && isset($_GET['debug'])) {
+    Response::json([
+        'debug' => true,
+        'method' => $method,
+        'path' => $path,
+        'version' => $version,
+        'resource' => $resource,
+        'id' => $id,
+        'action' => $action,
+        'segments' => $segments,
+        'body' => $body
+    ]);
+}
+
+// Router principal
+try {
+    switch ($resource) {
+        // =========================================
+        // AUTH ENDPOINTS
+        // =========================================
+        case 'auth':
+            require_once __DIR__ . '/v1/auth/router.php';
+            routeAuth($method, $id, $body);
+            break;
+            
+        // =========================================
+        // PROCESOS ENDPOINTS
+        // =========================================
+        case 'procesos':
+            require_once __DIR__ . '/v1/procesos/router.php';
+            routeProcesos($method, $id, $action, $body);
+            break;
+            
+        // =========================================
+        // ARCHIVOS ENDPOINTS
+        // =========================================
+        case 'archivos':
+            require_once __DIR__ . '/v1/archivos/router.php';
+            routeArchivos($method, $id, $action, $body);
+            break;
+            
+        // =========================================
+        // VALIDACION ENDPOINTS
+        // =========================================
+        case 'validacion':
+            require_once __DIR__ . '/v1/validacion/router.php';
+            routeValidacion($method, $id, $body);
+            break;
+            
+        // =========================================
+        // COLAS ENDPOINTS
+        // =========================================
+        case 'colas':
+            require_once __DIR__ . '/v1/colas/router.php';
+            routeColas($method, $id, $body);
+            break;
+            
+        // =========================================
+        // USUARIOS ENDPOINTS
+        // =========================================
+        case 'usuarios':
+            require_once __DIR__ . '/v1/usuarios/router.php';
+            routeUsuarios($method, $id, $action, $body);
+            break;
+            
+        // =========================================
+        // WEBHOOK ENDPOINTS (Workers)
+        // =========================================
+        case 'webhook':
+            require_once __DIR__ . '/v1/webhook/router.php';
+            routeWebhook($method, $id, $body);
+            break;
+            
+        // =========================================
+        // CONFIGURACIÓN ENDPOINTS
+        // =========================================
+        case 'config':
+            require_once __DIR__ . '/v1/config/router.php';
+            routeConfig($method, $id, $action, $body);
+            break;
+            
+        // =========================================
+        // ESTADÍSTICAS / DASHBOARD
+        // =========================================
+        case 'stats':
+        case 'dashboard':
+            require_once __DIR__ . '/v1/stats/router.php';
+            routeStats($method, $id, $body);
+            break;
+            
+        // =========================================
+        // HEALTH CHECK
+        // =========================================
+        case 'health':
+        case 'ping':
+            Response::json([
+                'status' => 'ok',
+                'timestamp' => date('c'),
+                'version' => APP_VERSION ?? '1.0.0',
+                'environment' => APP_ENV ?? 'production'
+            ]);
+            break;
+            
+        // =========================================
+        // ROOT - INFO DE API
+        // =========================================
+        case '':
+            Response::json([
+                'name' => 'ByBot API',
+                'version' => 'v1',
+                'status' => 'running',
+                'endpoints' => [
+                    '/api/v1/auth' => 'Autenticación',
+                    '/api/v1/procesos' => 'Gestión de procesos',
+                    '/api/v1/archivos' => 'Gestión de archivos',
+                    '/api/v1/validacion' => 'Validación de datos IA',
+                    '/api/v1/colas' => 'Estado de colas',
+                    '/api/v1/usuarios' => 'Gestión de usuarios',
+                    '/api/v1/webhook' => 'Callbacks de workers',
+                    '/api/v1/config' => 'Configuración',
+                    '/api/v1/stats' => 'Estadísticas',
+                    '/api/v1/health' => 'Health check'
+                ],
+                'documentation' => BASE_URL . '/docs'
+            ]);
+            break;
+            
+        // =========================================
+        // NOT FOUND
+        // =========================================
+        default:
+            Response::error("Recurso no encontrado: {$resource}", [], 404);
+    }
+    
+} catch (PDOException $e) {
+    error_log("Error de base de datos: " . $e->getMessage());
+    Response::error('Error de base de datos', 
+        APP_ENV === 'development' ? ['detail' => $e->getMessage()] : [], 
+        500
+    );
+    
+} catch (InvalidArgumentException $e) {
+    Response::error($e->getMessage(), [], 400);
+    
+} catch (Exception $e) {
+    error_log("Error en API: " . $e->getMessage() . "\n" . $e->getTraceAsString());
+    Response::error('Error interno del servidor', 
+        APP_ENV === 'development' ? ['detail' => $e->getMessage()] : [], 
+        500
+    );
+}
+

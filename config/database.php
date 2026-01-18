@@ -1,75 +1,52 @@
 <?php
 /**
- * Configuración de la base de datos - ByBot App
- * Motor: 11.8.3-MariaDB-log
+ * Configuración de Base de Datos - ByBot v2.0
  */
 
-// Cargar variables de entorno desde .env
 require_once __DIR__ . '/env_loader.php';
-loadEnv();
 
-// Detección de entorno: APP_ENV (development|production)
-$__appEnv = env('APP_ENV');
-if ($__appEnv === null || $__appEnv === '') {
-    $isCli = php_sapi_name() === 'cli';
-    $serverName = $_SERVER['SERVER_NAME'] ?? '';
-    $serverAddr = $_SERVER['SERVER_ADDR'] ?? '';
-    $httpHost   = $_SERVER['HTTP_HOST'] ?? '';
-    $looksLocal = (
-        $serverName === 'localhost' ||
-        $httpHost === 'localhost' ||
-        $serverAddr === '127.0.0.1' ||
-        strpos($httpHost, '.local') !== false ||
-        $isCli
-    );
-    $__appEnv = $looksLocal ? 'development' : 'production';
-}
-define('APP_ENV', $__appEnv);
-
-// Configuración de base de datos desde variables de entorno
-$dbHost = env('DB_HOST', 'localhost');
-$dbUser = env('DB_USER', null);
-$dbPass = env('DB_PASS', '');
-$dbName = env('DB_NAME', null);
-
-// Validar que las variables críticas estén definidas
-if ($dbUser === null || $dbUser === '') {
-    $envFile = __DIR__ . '/../.env';
-    $envExists = file_exists($envFile) ? 'existe' : 'NO existe';
-    die("Error: DB_USER no está definido. Por favor, configura el archivo .env o las variables de entorno del sistema.\n" .
-        "Archivo .env: $envFile ($envExists)");
-}
-if ($dbName === null || $dbName === '') {
-    $envFile = __DIR__ . '/../.env';
-    $envExists = file_exists($envFile) ? 'existe' : 'NO existe';
-    die("Error: DB_NAME no está definido. Por favor, configura el archivo .env o las variables de entorno del sistema.\n" .
-        "Archivo .env: $envFile ($envExists)");
+/**
+ * Obtener conexión PDO a la base de datos
+ */
+function getConnection() {
+    static $conn = null;
+    
+    if ($conn === null) {
+        $host = env('DB_HOST', 'localhost');
+        $port = env('DB_PORT', '3306');
+        $dbname = env('DB_NAME', 'bybot');
+        $user = env('DB_USER', 'root');
+        $pass = env('DB_PASS', '');
+        
+        try {
+            $dsn = "mysql:host=$host;port=$port;dbname=$dbname;charset=utf8mb4";
+            $conn = new PDO($dsn, $user, $pass, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false,
+                PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"
+            ]);
+        } catch (PDOException $e) {
+            if (APP_DEBUG) {
+                throw new Exception("Error de conexión a BD: " . $e->getMessage());
+            } else {
+                throw new Exception("Error de conexión a la base de datos");
+            }
+        }
+    }
+    
+    return $conn;
 }
 
-define('DB_HOST', $dbHost);
-define('DB_USER', $dbUser);
-define('DB_PASS', $dbPass);
-define('DB_NAME', $dbName);
-
+/**
+ * Clase para gestión de conexiones (Singleton Pattern)
+ */
 class Database {
     private static $instance = null;
     private $connection;
     
     private function __construct() {
-        try {
-            $this->connection = new PDO(
-                "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4",
-                DB_USER,
-                DB_PASS,
-                [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    PDO::ATTR_EMULATE_PREPARES => false
-                ]
-            );
-        } catch (PDOException $e) {
-            die("Error de conexión: " . $e->getMessage());
-        }
+        $this->connection = getConnection();
     }
     
     public static function getInstance() {
@@ -83,22 +60,66 @@ class Database {
         return $this->connection;
     }
     
-    private function __clone() {}
+    /**
+     * Ejecutar query SELECT
+     */
+    public function query($sql, $params = []) {
+        $stmt = $this->connection->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
     
-    public function __wakeup() {}
-}
-
-function getConnection() {
-    return Database::getInstance()->getConnection();
-}
-
-function testConnection() {
-    try {
-        $conn = Database::getInstance()->getConnection();
-        return true;
-    } catch (Exception $e) {
-        return false;
+    /**
+     * Ejecutar query SELECT y obtener un solo registro
+     */
+    public function queryOne($sql, $params = []) {
+        $stmt = $this->connection->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetch();
+    }
+    
+    /**
+     * Ejecutar INSERT/UPDATE/DELETE
+     */
+    public function execute($sql, $params = []) {
+        $stmt = $this->connection->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->rowCount();
+    }
+    
+    /**
+     * Obtener último ID insertado
+     */
+    public function lastInsertId() {
+        return $this->connection->lastInsertId();
+    }
+    
+    /**
+     * Iniciar transacción
+     */
+    public function beginTransaction() {
+        return $this->connection->beginTransaction();
+    }
+    
+    /**
+     * Confirmar transacción
+     */
+    public function commit() {
+        return $this->connection->commit();
+    }
+    
+    /**
+     * Revertir transacción
+     */
+    public function rollback() {
+        return $this->connection->rollBack();
+    }
+    
+    /**
+     * Verificar si hay transacción activa
+     */
+    public function inTransaction() {
+        return $this->connection->inTransaction();
     }
 }
-?>
 

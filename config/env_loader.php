@@ -1,114 +1,132 @@
 <?php
 /**
- * Cargador de variables de entorno desde archivo .env
- * ByBot App
+ * Cargador de Variables de Entorno - ByBot v2.0
+ * 
+ * Carga variables desde el archivo .env en la raíz del proyecto
  */
 
-$GLOBALS['_BY_BOT_ENV'] = [];
-
-/**
- * Carga variables de entorno desde archivo .env
- */
-function loadEnv() {
-    // Buscar .env en la raíz del proyecto (igual que database.php)
-    // Primero intentar desde DOCUMENT_ROOT (producción)
-    // Luego desde la raíz relativa al config (desarrollo)
-    $envFile = null;
+class EnvLoader {
+    private static $loaded = false;
+    private static $vars = [];
     
-    // 1. DOCUMENT_ROOT/.env (producción - donde está realmente)
-    if (isset($_SERVER['DOCUMENT_ROOT'])) {
-        $docRootEnv = $_SERVER['DOCUMENT_ROOT'] . '/.env';
-        if (file_exists($docRootEnv) && is_readable($docRootEnv)) {
-            $envFile = $docRootEnv;
-        }
-    }
-    
-    // 2. __DIR__/../.env (desarrollo - relativo a config/)
-    if (!$envFile) {
-        $relativeEnv = __DIR__ . '/../.env';
-        if (file_exists($relativeEnv) && is_readable($relativeEnv)) {
-            $envFile = $relativeEnv;
-        }
-    }
-    
-    if (!$envFile) {
-        return;
-    }
-    
-    $handle = fopen($envFile, 'r');
-    if (!$handle) {
-        return;
-    }
-    
-    while (($line = fgets($handle)) !== false) {
-        $line = trim($line);
-        
-        // Ignorar líneas vacías y comentarios
-        if ($line === '' || substr($line, 0, 1) === '#') {
-            continue;
+    /**
+     * Cargar variables de entorno desde .env
+     */
+    public static function load($path = null) {
+        if (self::$loaded) {
+            return;
         }
         
-        // Buscar el signo igual
-        $pos = strpos($line, '=');
-        if ($pos === false) {
-            continue;
+        if ($path === null) {
+            $path = dirname(__DIR__) . '/.env';
         }
         
-        $key = trim(substr($line, 0, $pos));
-        $value = trim(substr($line, $pos + 1));
-        
-        if ($key === '') {
-            continue;
-        }
-        
-        // Remover comillas
-        $len = strlen($value);
-        if ($len >= 2) {
-            $first = substr($value, 0, 1);
-            $last = substr($value, -1);
-            if (($first === '"' && $last === '"') || ($first === "'" && $last === "'")) {
-                $value = substr($value, 1, $len - 2);
+        if (!file_exists($path)) {
+            // Intentar con .env.example como fallback en desarrollo
+            $examplePath = dirname(__DIR__) . '/.env.example';
+            if (file_exists($examplePath)) {
+                $path = $examplePath;
+            } else {
+                throw new Exception("Archivo .env no encontrado en: $path");
             }
         }
         
-        // Guardar variables
-        $GLOBALS['_BY_BOT_ENV'][$key] = $value;
-        $_SERVER[$key] = $value;
-        $_ENV[$key] = $value;
+        $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        
+        foreach ($lines as $line) {
+            // Ignorar comentarios
+            if (strpos(trim($line), '#') === 0) {
+                continue;
+            }
+            
+            // Parsear KEY=VALUE
+            if (strpos($line, '=') !== false) {
+                list($key, $value) = explode('=', $line, 2);
+                $key = trim($key);
+                $value = trim($value);
+                
+                // Remover comillas si existen
+                $value = trim($value, '"\'');
+                
+                // Guardar en array interno y en $_ENV
+                self::$vars[$key] = $value;
+                $_ENV[$key] = $value;
+                putenv("$key=$value");
+            }
+        }
+        
+        self::$loaded = true;
     }
     
-    fclose($handle);
-}
-
-/**
- * Obtiene una variable de entorno
- */
-function env($key, $default = null) {
-    // Buscar en $GLOBALS['_BY_BOT_ENV'] primero
-    if (isset($GLOBALS['_BY_BOT_ENV'][$key])) {
-        $value = $GLOBALS['_BY_BOT_ENV'][$key];
+    /**
+     * Obtener variable de entorno
+     */
+    public static function get($key, $default = null) {
+        if (!self::$loaded) {
+            self::load();
+        }
+        
+        return self::$vars[$key] ?? $_ENV[$key] ?? getenv($key) ?: $default;
     }
-    // Luego en $_ENV, $_SERVER y getenv()
-    elseif (isset($_ENV[$key])) {
-        $value = $_ENV[$key];
+    
+    /**
+     * Verificar si una variable existe
+     */
+    public static function has($key) {
+        if (!self::$loaded) {
+            self::load();
+        }
+        
+        return isset(self::$vars[$key]) || isset($_ENV[$key]) || getenv($key) !== false;
     }
-    elseif (isset($_SERVER[$key])) {
-        $value = $_SERVER[$key];
-    }
-    else {
-        $value = getenv($key);
-        if ($value === false) {
+    
+    /**
+     * Obtener variable como booleano
+     */
+    public static function getBool($key, $default = false) {
+        $value = self::get($key);
+        
+        if ($value === null) {
             return $default;
         }
+        
+        return in_array(strtolower($value), ['true', '1', 'yes', 'on'], true);
     }
     
-    // Convertir strings booleanos
-    if (is_string($value)) {
-        $lower = strtolower(trim($value));
-        if ($lower === 'true') return true;
-        if ($lower === 'false') return false;
+    /**
+     * Obtener variable como entero
+     */
+    public static function getInt($key, $default = 0) {
+        $value = self::get($key);
+        return $value !== null ? (int)$value : $default;
     }
     
-    return $value;
+    /**
+     * Obtener variable como float
+     */
+    public static function getFloat($key, $default = 0.0) {
+        $value = self::get($key);
+        return $value !== null ? (float)$value : $default;
+    }
+    
+    /**
+     * Obtener todas las variables cargadas
+     */
+    public static function all() {
+        if (!self::$loaded) {
+            self::load();
+        }
+        return self::$vars;
+    }
+}
+
+// Auto-cargar al incluir este archivo
+EnvLoader::load();
+
+/**
+ * Función helper global para obtener variables de entorno
+ */
+function env($key, $default = null) {
+    return EnvLoader::get($key, $default);
 }
 

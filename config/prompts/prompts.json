@@ -1,0 +1,22 @@
+{
+    "version": "1.0",
+    "updated_at": "2026-01-16",
+    "prompts": {
+        "estado_cuenta": {
+            "active_version": "v1",
+            "description": "Extracción de datos del estado de cuenta",
+            "file": "v1/estado_cuenta.md"
+        },
+        "anexos": {
+            "active_version": "v1",
+            "description": "Extracción de datos de deudor y codeudor",
+            "file": "v1/anexos.md"
+        },
+        "vinculacion": {
+            "active_version": "v1",
+            "description": "Identificación de solicitudes de vinculación",
+            "file": "v1/vinculacion.md"
+        }
+    }
+}
+

@@ -1,0 +1,355 @@
+{
+  "name": "ByBot - Llenado de Pagaré",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "llenado",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-llenado",
+      "name": "Webhook Llenado",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "bybot-llenado"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"success\": true, \"message\": \"Llenado en proceso\", \"proceso_id\": {{ $json.proceso_id }}}",
+        "options": {}
+      },
+      "id": "respuesta-inmediata-llenado",
+      "name": "Respuesta Inmediata",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "number": [
+            {
+              "name": "proceso_id",
+              "value": "={{ $json.proceso_id }}"
+            }
+          ],
+          "string": [
+            {
+              "name": "codigo",
+              "value": "={{ $json.codigo }}"
+            },
+            {
+              "name": "callback_url",
+              "value": "={{ $json.callback_url }}"
+            },
+            {
+              "name": "api_token",
+              "value": "={{ $json.api_token }}"
+            },
+            {
+              "name": "pagare_path",
+              "value": "={{ $json.pagare_original_path }}"
+            }
+          ],
+          "object": [
+            {
+              "name": "datos_validados",
+              "value": "={{ $json.datos_validados }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-variables-llenado",
+      "name": "Set Variables",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://bybjuridicos.andapps.cloud/web/api/v1/archivos/servir?archivo={{ $json.pagare_path }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-Access-Token",
+              "value": "={{ $json.api_token }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "descargar-pagare",
+      "name": "Descargar Pagaré Original",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/tmp/pagare_{{ $('Set Variables').item.json.proceso_id }}.pdf",
+        "dataPropertyName": "data"
+      },
+      "id": "guardar-pagare",
+      "name": "Guardar Pagaré Temporal",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "command": "=cd /opt/bybot/scripts && python filler/main.py --proceso_id {{ $('Set Variables').item.json.proceso_id }} --pagare_local '/tmp/pagare_{{ $('Set Variables').item.json.proceso_id }}.pdf' --datos '{{ JSON.stringify($('Set Variables').item.json.datos_validados) }}' --no_callback --no_upload"
+      },
+      "id": "ejecutar-llenado",
+      "name": "Ejecutar Llenado Python",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1340, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-success-llenado",
+              "leftValue": "={{ $json.exitCode }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "verificar-resultado-llenado",
+      "name": "¿Éxito Llenado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parsear stdout para obtener datos del resultado\nconst resultado = JSON.parse($input.first().json.stdout);\nreturn [{\n  json: {\n    output_path: resultado.output_path,\n    archivo_base64: resultado.archivo_base64\n  }\n}];"
+      },
+      "id": "parsear-resultado",
+      "name": "Parsear Resultado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Set Variables').item.json.callback_url }}/llenado",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-Access-Token",
+              "value": "={{ $('Set Variables').item.json.api_token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"proceso_id\": {{ $('Set Variables').item.json.proceso_id }},\n  \"success\": true,\n  \"archivo_contenido_base64\": \"{{ $json.archivo_base64 }}\",\n  \"archivo_nombre\": \"pagare_llenado_{{ $('Set Variables').item.json.codigo }}.pdf\"\n}"
+      },
+      "id": "callback-exito-llenado",
+      "name": "Callback Éxito Llenado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Set Variables').item.json.callback_url }}/llenado",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-Access-Token",
+              "value": "={{ $('Set Variables').item.json.api_token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"proceso_id\": {{ $('Set Variables').item.json.proceso_id }},\n  \"success\": false,\n  \"error\": \"{{ $json.stderr || 'Error desconocido en llenado' }}\"\n}"
+      },
+      "id": "callback-error-llenado",
+      "name": "Callback Error Llenado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 400]
+    },
+    {
+      "parameters": {
+        "command": "=rm -f /tmp/pagare_{{ $('Set Variables').item.json.proceso_id }}.pdf /tmp/pagare_llenado_{{ $('Set Variables').item.json.proceso_id }}*.pdf"
+      },
+      "id": "limpiar-archivos",
+      "name": "Limpiar Archivos Temporales",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [2220, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Llenado": {
+      "main": [
+        [
+          {
+            "node": "Respuesta Inmediata",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Set Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Variables": {
+      "main": [
+        [
+          {
+            "node": "Descargar Pagaré Original",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descargar Pagaré Original": {
+      "main": [
+        [
+          {
+            "node": "Guardar Pagaré Temporal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar Pagaré Temporal": {
+      "main": [
+        [
+          {
+            "node": "Ejecutar Llenado Python",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ejecutar Llenado Python": {
+      "main": [
+        [
+          {
+            "node": "¿Éxito Llenado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Éxito Llenado?": {
+      "main": [
+        [
+          {
+            "node": "Parsear Resultado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Callback Error Llenado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear Resultado": {
+      "main": [
+        [
+          {
+            "node": "Callback Éxito Llenado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Callback Éxito Llenado": {
+      "main": [
+        [
+          {
+            "node": "Limpiar Archivos Temporales",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Callback Error Llenado": {
+      "main": [
+        [
+          {
+            "node": "Limpiar Archivos Temporales",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "ByBot"
+    }
+  ],
+  "triggerCount": 1,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "bybot-instance"
+  }
+}
+
