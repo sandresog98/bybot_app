@@ -29,7 +29,11 @@ if (defined('APP_URL') && !empty(APP_URL)) {
     // Extraer rutas relativas desde la raíz del proyecto
     // adminBasePath ejemplo: /projects/bybot/web/admin -> necesitamos /web/admin
     $projectBasePath = dirname(dirname($adminBasePath)); // Raíz del proyecto
-    $relativeAdminPath = str_replace($projectBasePath, '', $adminBasePath); // /web/admin
+    $relativeAdminPath = str_replace($projectBasePath, '', $adminBasePath); // /web/admin o web/admin
+    // Asegurar que empiece con /
+    if (!empty($relativeAdminPath) && $relativeAdminPath[0] !== '/') {
+        $relativeAdminPath = '/' . $relativeAdminPath;
+    }
     $relativeApiPath = dirname($relativeAdminPath) . '/api/v1'; // /web/api/v1
     $relativeAssetsPath = '/assets'; // Siempre /assets desde la raíz del proyecto
     
@@ -53,7 +57,12 @@ if (defined('APP_URL') && !empty(APP_URL)) {
  * Genera URL completa para una página del admin
  */
 function adminUrl(string $path = ''): string {
-    return ADMIN_URL . '/' . ltrim($path, '/');
+    $url = ADMIN_URL;
+    if (!empty($path)) {
+        // Asegurar que ADMIN_URL termine con / y path no empiece con /
+        $url = rtrim($url, '/') . '/' . ltrim($path, '/');
+    }
+    return $url;
 }
 
 /**
