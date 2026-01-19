@@ -33,9 +33,12 @@ $parsedPath = parse_url($requestUri, PHP_URL_PATH);
 $path = str_replace($basePath, '', $parsedPath);
 $path = trim($path, '/');
 
-// Si el path es solo "index.php" o está vacío, intentar obtener desde REQUEST_URI
-// Esto puede pasar cuando se accede directamente a index.php o cuando el rewrite no funciona
-if ($path === 'index.php' || empty($path)) {
+// Remover "index.php" del path si está presente
+$path = str_replace('index.php', '', $path);
+$path = trim($path, '/');
+
+// Si el path está vacío o es solo "index.php", intentar obtener desde REQUEST_URI
+if (empty($path) || $path === 'index.php') {
     // Si hay un parámetro 'resource' en GET, usarlo (para debugging)
     if (isset($_GET['resource'])) {
         $path = 'v1/' . $_GET['resource'];
@@ -46,8 +49,12 @@ if ($path === 'index.php' || empty($path)) {
         $pathParts = explode('/', $fullPath);
         $apiIndex = array_search('api', $pathParts);
         if ($apiIndex !== false && isset($pathParts[$apiIndex + 1])) {
-            // Tomar todo después de 'api'
-            $path = implode('/', array_slice($pathParts, $apiIndex + 1));
+            // Tomar todo después de 'api', pero saltar 'index.php' si existe
+            $afterApi = array_slice($pathParts, $apiIndex + 1);
+            $afterApi = array_filter($afterApi, function($part) {
+                return $part !== 'index.php';
+            });
+            $path = implode('/', $afterApi);
         } else {
             // Si no se encuentra, usar path vacío (root de API)
             $path = '';
@@ -62,7 +69,7 @@ $segments = $path ? explode('/', $path) : [];
 $version = array_shift($segments) ?? 'v1';
 
 if ($version !== 'v1') {
-    Response::error("Versión de API no soportada: {$version}", [], 400);
+    Response::error("Versión de API no soportada: {$version}", 400, []);
 }
 
 // Obtener recurso principal
@@ -213,24 +220,24 @@ try {
         // NOT FOUND
         // =========================================
         default:
-            Response::error("Recurso no encontrado: {$resource}", [], 404);
+            Response::error("Recurso no encontrado: {$resource}", 404, []);
     }
     
 } catch (PDOException $e) {
     error_log("Error de base de datos: " . $e->getMessage());
     Response::error('Error de base de datos', 
-        APP_ENV === 'development' ? ['detail' => $e->getMessage()] : [], 
-        500
+        500,
+        APP_ENV === 'development' ? ['detail' => $e->getMessage()] : []
     );
     
 } catch (InvalidArgumentException $e) {
-    Response::error($e->getMessage(), [], 400);
+    Response::error($e->getMessage(), 400, []);
     
 } catch (Exception $e) {
     error_log("Error en API: " . $e->getMessage() . "\n" . $e->getTraceAsString());
     Response::error('Error interno del servidor', 
-        APP_ENV === 'development' ? ['detail' => $e->getMessage()] : [], 
-        500
+        500,
+        APP_ENV === 'development' ? ['detail' => $e->getMessage()] : []
     );
 }
 
