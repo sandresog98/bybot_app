@@ -29,8 +29,31 @@ $scriptPath = dirname($_SERVER['SCRIPT_NAME']);
 $basePath = rtrim($scriptPath, '/');
 
 // Extraer path relativo a la base de la API
-$path = str_replace($basePath, '', parse_url($requestUri, PHP_URL_PATH));
+$parsedPath = parse_url($requestUri, PHP_URL_PATH);
+$path = str_replace($basePath, '', $parsedPath);
 $path = trim($path, '/');
+
+// Si el path es solo "index.php" o está vacío, intentar obtener desde REQUEST_URI
+// Esto puede pasar cuando se accede directamente a index.php o cuando el rewrite no funciona
+if ($path === 'index.php' || empty($path)) {
+    // Si hay un parámetro 'resource' en GET, usarlo (para debugging)
+    if (isset($_GET['resource'])) {
+        $path = 'v1/' . $_GET['resource'];
+    } else {
+        // Intentar extraer el path desde REQUEST_URI completo
+        // Buscar 'api' en el path y tomar todo lo que viene después
+        $fullPath = trim($parsedPath, '/');
+        $pathParts = explode('/', $fullPath);
+        $apiIndex = array_search('api', $pathParts);
+        if ($apiIndex !== false && isset($pathParts[$apiIndex + 1])) {
+            // Tomar todo después de 'api'
+            $path = implode('/', array_slice($pathParts, $apiIndex + 1));
+        } else {
+            // Si no se encuentra, usar path vacío (root de API)
+            $path = '';
+        }
+    }
+}
 
 // Parsear segmentos del path
 $segments = $path ? explode('/', $path) : [];
