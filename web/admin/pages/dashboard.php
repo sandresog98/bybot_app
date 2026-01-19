@@ -571,8 +571,21 @@ async function loadPendientesValidacion() {
     if (!tbody) return;
     
     try {
-        // Construir URL usando la función helper para evitar barras duplicadas
-        let url = CONFIG.apiUrlFor('procesos') + '?estado=analizado&per_page=5';
+        // Construir URL asegurándonos de que no haya barras duplicadas
+        // Usar función helper si está disponible, sino construir manualmente
+        let baseUrl = CONFIG.apiUrl || '';
+        baseUrl = baseUrl.replace(/\/+$/, ''); // Remover barras finales
+        
+        // Construir endpoint sin barra inicial
+        let endpoint = 'procesos';
+        endpoint = endpoint.replace(/^\/+/, ''); // Remover barras iniciales
+        
+        // Construir URL final sin barras duplicadas
+        let url = `${baseUrl}/${endpoint}?estado=analizado&per_page=5`;
+        
+        // Debug: verificar URL construida
+        console.log('URL construida para procesos:', url);
+        
         let response = await fetch(url, {
             credentials: 'include',
             headers: {
@@ -582,8 +595,8 @@ async function loadPendientesValidacion() {
         });
         
         // Si falla con 403, puede ser problema de Apache bloqueando
-        // Intentar con la URL completa incluyendo el path base
         if (!response.ok && response.status === 403) {
+            console.error('Error 403 en:', url);
             console.warn('Error 403 detectado, puede ser problema de configuración de Apache');
             // Mostrar mensaje informativo
             tbody.innerHTML = '<tr><td colspan="5" class="text-center text-warning py-4"><small>No se pueden cargar los procesos pendientes. Verifica la configuración del servidor.</small></td></tr>';

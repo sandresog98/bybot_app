@@ -113,14 +113,21 @@ Después de aplicar estos cambios, las siguientes URLs deberían funcionar:
 2. **Rendimiento**: Las condiciones `-f` y `-d` verifican la existencia de archivos/directorios, lo cual es eficiente
 3. **Seguridad**: Se mantienen las reglas de bloqueo de archivos sensibles y headers de seguridad
 
+## Ubicación del archivo en el servidor
+
+**Ruta completa en servidor**: `/public_html/bybjuridicos/web/api/.htaccess`
+
+Asegúrate de subir el archivo `.htaccess` a esta ubicación exacta.
+
 ## Si el problema persiste
 
 Si después de aplicar estos cambios aún recibes errores 403:
 
-1. **Verifica los logs de Apache**: Revisa `/var/log/apache2/error.log` o el equivalente en Hostinger
-2. **Verifica mod_rewrite**: Asegúrate de que el módulo `mod_rewrite` esté habilitado
-3. **Verifica permisos**: El archivo `.htaccess` debe tener permisos de lectura (644)
-4. **Verifica la ruta base**: Asegúrate de que la ruta base de tu aplicación sea correcta
+1. **Verifica la ubicación del archivo**: El `.htaccess` debe estar en `/public_html/bybjuridicos/web/api/.htaccess`
+2. **Verifica los logs de Apache**: Revisa los logs de error en el panel de Hostinger
+3. **Verifica mod_rewrite**: Asegúrate de que el módulo `mod_rewrite` esté habilitado
+4. **Verifica permisos**: El archivo `.htaccess` debe tener permisos de lectura (644)
+5. **Verifica la ruta base**: Asegúrate de que la ruta base de tu aplicación sea correcta
 
 ## Pregunta para Hostinger (si el problema persiste)
 
