@@ -114,18 +114,35 @@ if (empty($body) && !empty($_POST)) {
     $body = $_POST;
 }
 
-// Debug info (solo en desarrollo)
-if (APP_ENV === 'development' && isset($_GET['debug'])) {
+// Debug info (solo en desarrollo o con parámetro debug)
+if ((defined('APP_DEBUG') && APP_DEBUG) || isset($_GET['debug'])) {
+    // Iniciar sesión para debug
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    
     Response::json([
         'debug' => true,
         'method' => $method,
+        'request_uri' => $requestUri,
+        'script_name' => $_SERVER['SCRIPT_NAME'] ?? null,
+        'parsed_path' => $parsedPath,
+        'base_path' => $basePath,
         'path' => $path,
         'version' => $version,
         'resource' => $resource,
         'id' => $id,
         'action' => $action,
         'segments' => $segments,
-        'body' => $body
+        'query_string' => $_SERVER['QUERY_STRING'] ?? null,
+        'get_params' => $_GET,
+        'session' => [
+            'id' => session_id(),
+            'status' => session_status(),
+            'has_user_id' => isset($_SESSION['user_id']),
+            'user_id' => $_SESSION['user_id'] ?? null,
+            'cookie_params' => session_get_cookie_params()
+        ]
     ]);
 }
 

@@ -47,10 +47,17 @@ class AuthMiddleware {
         
         // Si la autenticación es requerida, devolver error
         if ($required) {
-            // Log para debugging (solo en desarrollo)
-            if (defined('APP_DEBUG') && APP_DEBUG) {
-                error_log("Auth failed - Session ID: " . session_id() . ", User ID in session: " . ($_SESSION['user_id'] ?? 'none'));
-            }
+            // Log para debugging
+            $sessionInfo = [
+                'session_id' => session_id(),
+                'session_status' => session_status(),
+                'has_user_id' => isset($_SESSION['user_id']),
+                'has_user' => isset($_SESSION['user']),
+                'user_id' => $_SESSION['user_id'] ?? null,
+                'cookie_params' => session_get_cookie_params(),
+                'request_uri' => $_SERVER['REQUEST_URI'] ?? null
+            ];
+            error_log("Auth failed: " . json_encode($sessionInfo));
             Response::unauthorized('No autenticado');
         }
         
