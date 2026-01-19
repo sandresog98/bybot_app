@@ -9,6 +9,19 @@ error_reporting(E_ALL);
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
+// Configurar sesión para compartir cookies entre admin y API
+if (session_status() === PHP_SESSION_NONE) {
+    // Asegurar que la cookie de sesión se comparta en todo el dominio
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'domain' => '',
+        'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+}
+
 // Cargar configuración base
 require_once dirname(__DIR__, 2) . '/config/constants.php';
 require_once BASE_DIR . '/web/core/Response.php';

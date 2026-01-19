@@ -38,7 +38,7 @@ class AuthMiddleware {
         
         // Si la autenticación es requerida, devolver error
         if ($required) {
-            Response::error('No autenticado', [], 401);
+            Response::unauthorized('No autenticado');
         }
         
         return null;
@@ -240,7 +240,7 @@ class AuthMiddleware {
      */
     public static function requireRole(string $role): void {
         if (!self::hasRole($role)) {
-            Response::error('No tienes permisos para esta acción', [], 403);
+            Response::forbidden('No tienes permisos para esta acción');
         }
     }
     
@@ -249,7 +249,7 @@ class AuthMiddleware {
      */
     public static function requireAccess(string $module): void {
         if (!self::hasAccess($module)) {
-            Response::error("No tienes acceso al módulo: {$module}", [], 403);
+            Response::forbidden("No tienes acceso al módulo: {$module}");
         }
     }
     

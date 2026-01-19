@@ -10,6 +10,15 @@ require_once dirname(__DIR__) . '/config/paths.php';
  */
 function initSession(): void {
     if (session_status() === PHP_SESSION_NONE) {
+        // Configurar cookie de sesión para compartir entre admin y API
+        session_set_cookie_params([
+            'lifetime' => 0,
+            'path' => '/',
+            'domain' => '',
+            'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ]);
         session_start();
     }
 }
