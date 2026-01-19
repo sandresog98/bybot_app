@@ -19,6 +19,15 @@ class AuthMiddleware {
     public static function check(bool $required = true): ?array {
         // Iniciar sesión si no está iniciada
         if (session_status() === PHP_SESSION_NONE) {
+            // Configurar cookie de sesión para compartir entre admin y API
+            session_set_cookie_params([
+                'lifetime' => 0,
+                'path' => '/',
+                'domain' => '',
+                'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+                'httponly' => true,
+                'samesite' => 'Lax'
+            ]);
             session_start();
         }
         
@@ -38,6 +47,10 @@ class AuthMiddleware {
         
         // Si la autenticación es requerida, devolver error
         if ($required) {
+            // Log para debugging (solo en desarrollo)
+            if (defined('APP_DEBUG') && APP_DEBUG) {
+                error_log("Auth failed - Session ID: " . session_id() . ", User ID in session: " . ($_SESSION['user_id'] ?? 'none'));
+            }
             Response::unauthorized('No autenticado');
         }
         

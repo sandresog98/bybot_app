@@ -317,9 +317,75 @@ async function loadDashboardStats() {
         
         // Actualizar gráficos
         updateChartDistribucion(stats.procesos_por_estado || {});
+        updateChartProcesos(stats.procesos_por_estado || {});
         
     } catch (error) {
         console.error('Error:', error);
+    }
+}
+
+function updateChartProcesos(porEstado) {
+    const ctx = document.getElementById('chartProcesos');
+    if (!ctx) return;
+    
+    const labels = [];
+    const datos = [];
+    const colores = [];
+    
+    // Ordenar por cantidad descendente
+    const sorted = Object.entries(porEstado)
+        .filter(([estado, cantidad]) => cantidad > 0)
+        .sort((a, b) => b[1] - a[1]);
+    
+    sorted.forEach(([estado, cantidad]) => {
+        labels.push(nombresEstados[estado] || estado);
+        datos.push(cantidad);
+        colores.push(coloresEstados[estado] || '#ccc');
+    });
+    
+    if (chartProcesos) {
+        chartProcesos.data.labels = labels;
+        chartProcesos.data.datasets[0].data = datos;
+        chartProcesos.data.datasets[0].backgroundColor = colores;
+        chartProcesos.update();
+    } else {
+        chartProcesos = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Procesos',
+                    data: datos,
+                    backgroundColor: colores,
+                    borderColor: colores.map(c => c + '80'),
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.parsed.y + ' procesos';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                }
+            }
+        });
     }
 }
 
@@ -472,7 +538,10 @@ async function loadPendientesValidacion() {
     
     try {
         const response = await fetch(CONFIG.apiUrl + '/procesos?estado=analizado&per_page=5', {
-            credentials: 'include'
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            }
         });
         
         if (!response.ok) throw new Error('Error');

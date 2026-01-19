@@ -87,7 +87,7 @@ $segments = array_values($segments); // Reindexar
 $version = array_shift($segments) ?? 'v1';
 
 if ($version !== 'v1') {
-    Response::error("Versión de API no soportada: {$version}", 400, []);
+    Response::jsonError("Versión de API no soportada: {$version}", 400);
 }
 
 // Obtener recurso principal

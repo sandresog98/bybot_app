@@ -6,6 +6,13 @@
 require_once __DIR__ . '/config/paths.php';
 require_once __DIR__ . '/utils/session.php';
 
+// Helper para assetUrl si no está definido
+if (!function_exists('assetUrl')) {
+    function assetUrl(string $path): string {
+        return ASSETS_URL . '/' . ltrim($path, '/');
+    }
+}
+
 // Si ya está autenticado, redirigir al dashboard
 if (isAuthenticated()) {
     redirect('index.php');
@@ -109,6 +116,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Iniciar Sesión - ByBot</title>
+    
+    <!-- Favicon -->
+    <?php if (defined('ASSETS_URL')): ?>
+        <link rel="icon" type="image/x-icon" href="<?= assetUrl('favicons/favicon.ico') ?>">
+    <?php else: ?>
+        <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <?php endif; ?>
     
     <!-- Bootstrap 5.3 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">

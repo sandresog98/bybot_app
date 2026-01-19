@@ -1,0 +1,26 @@
+# =============================================
+# .htaccess - ByBot Root
+# =============================================
+
+# Redirigir favicon.ico al handler PHP
+RewriteEngine On
+RewriteRule ^favicon\.ico$ favicon.php [L]
+
+# Seguridad: bloquear acceso a archivos sensibles
+<FilesMatch "\.(env|log|md|json|sql)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Headers de seguridad
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>
+
