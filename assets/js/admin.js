@@ -4,12 +4,15 @@
  */
 
 // Configuración global
-const CONFIG = {
-    apiUrl: window.APP_CONFIG?.apiUrl || '/bybot/web/api/v1',
-    adminUrl: window.APP_CONFIG?.adminUrl || '/bybot/web/admin',
-    wsUrl: window.APP_CONFIG?.wsUrl || 'ws://localhost:8080',
-    debug: window.APP_CONFIG?.debug || false
-};
+// CONFIG se define en footer.php, solo declarar si no existe
+if (typeof CONFIG === 'undefined') {
+    var CONFIG = {
+        apiUrl: window.APP_CONFIG?.apiUrl || '/web/api/v1',
+        adminUrl: window.APP_CONFIG?.adminUrl || '/web/admin',
+        wsUrl: window.APP_CONFIG?.wsUrl || 'ws://localhost:8080',
+        debug: window.APP_CONFIG?.debug || false
+    };
+}
 
 // Estado global
 const AppState = {

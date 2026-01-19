@@ -39,7 +39,14 @@ if (defined('APP_URL') && !empty(APP_URL)) {
     $relativeAssetsPath = '/assets'; // Siempre /assets desde la raíz del proyecto
     
     // Construir URLs completas
-    $baseUrl = $protocol . '://' . $host . $appBasePath;
+    // Si appBasePath ya incluye parte del path, no duplicar
+    // Ejemplo: si APP_URL es https://domain.com/bybot y adminDirRelative es /web/admin
+    // entonces ADMIN_URL debe ser https://domain.com/bybot/web/admin
+    $baseUrl = $protocol . '://' . $host;
+    // Si appBasePath no está vacío, agregarlo
+    if (!empty($appBasePath)) {
+        $baseUrl .= $appBasePath;
+    }
     define('ADMIN_URL', $baseUrl . $relativeAdminPath);
     define('API_URL', $baseUrl . $relativeApiPath);
     define('ASSETS_URL', $baseUrl . $relativeAssetsPath);
