@@ -67,22 +67,32 @@ function handleEstado(): void {
     
     try {
         require_once BASE_DIR . '/web/core/QueueManager.php';
-        $queue = new QueueManager();
+        $queue = QueueManager::getInstance();
         
-        $estado['redis_conectado'] = true;
-        
-        // Obtener tamaño de cada cola
-        $colas = ['bybot:analyze', 'bybot:fill', 'bybot:notify'];
-        foreach ($colas as $cola) {
-            $estado['colas'][$cola] = [
-                'nombre' => $cola,
-                'pendientes' => $queue->size($cola)
+        if ($queue->isConnected()) {
+            $estado['redis_conectado'] = true;
+            
+            // Obtener tamaño de cada cola usando constantes
+            $colas = [
+                Cola::ANALYZE => 'Análisis IA',
+                Cola::FILL => 'Llenado Pagaré',
+                Cola::NOTIFY => 'Notificaciones'
             ];
+            foreach ($colas as $colaNombre => $colaLabel) {
+                $estado['colas'][$colaNombre] = [
+                    'nombre' => $colaLabel,
+                    'pendientes' => $queue->getQueueLength($colaNombre)
+                ];
+            }
+        } else {
+            $estado['redis_conectado'] = false;
+            $estado['error'] = 'No se pudo conectar a Redis';
         }
         
     } catch (Exception $e) {
         $estado['redis_conectado'] = false;
         $estado['error'] = 'No se pudo conectar a Redis: ' . $e->getMessage();
+        error_log("Error en handleEstado: " . $e->getMessage());
     }
     
     // Obtener trabajos registrados en BD

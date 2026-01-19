@@ -64,6 +64,11 @@ if (empty($path) || $path === 'index.php') {
 
 // Parsear segmentos del path
 $segments = $path ? explode('/', $path) : [];
+// Filtrar segmentos vacíos (pueden aparecer por barras diagonales dobles o al final)
+$segments = array_filter($segments, function($seg) {
+    return !empty($seg);
+});
+$segments = array_values($segments); // Reindexar
 
 // Obtener versión de API (v1, v2, etc.)
 $version = array_shift($segments) ?? 'v1';
@@ -78,6 +83,14 @@ $resource = array_shift($segments) ?? '';
 // Obtener ID o acción
 $id = array_shift($segments);
 $action = array_shift($segments);
+
+// Normalizar: si $id es cadena vacía, convertir a null
+if ($id === '') {
+    $id = null;
+}
+if ($action === '') {
+    $action = null;
+}
 
 // Obtener body de la solicitud
 $input = file_get_contents('php://input');

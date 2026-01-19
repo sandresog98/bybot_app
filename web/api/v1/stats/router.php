@@ -109,15 +109,21 @@ function handleDashboard(): void {
     $stats['colas'] = [];
     try {
         require_once BASE_DIR . '/web/core/QueueManager.php';
-        $queue = new QueueManager();
-        $stats['colas'] = [
-            'analyze' => $queue->size('bybot:analyze'),
-            'fill' => $queue->size('bybot:fill'),
-            'notify' => $queue->size('bybot:notify')
-        ];
-        $stats['redis_conectado'] = true;
+        $queue = QueueManager::getInstance();
+        if ($queue->isConnected()) {
+            // Usar constantes de Cola
+            $stats['colas'] = [
+                'analyze' => $queue->getQueueLength(Cola::ANALYZE),
+                'fill' => $queue->getQueueLength(Cola::FILL),
+                'notify' => $queue->getQueueLength(Cola::NOTIFY)
+            ];
+            $stats['redis_conectado'] = true;
+        } else {
+            $stats['redis_conectado'] = false;
+        }
     } catch (Exception $e) {
         $stats['redis_conectado'] = false;
+        error_log("Error obteniendo estado de colas: " . $e->getMessage());
     }
     
     // Actividad reciente (últimas 5)
