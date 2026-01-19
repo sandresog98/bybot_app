@@ -5,12 +5,16 @@
 
 RewriteEngine On
 
+# Permitir acceso directo a index.php
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^index\.php$ - [L]
+
 # Si el archivo o directorio existe, no reescribir
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 
-# Redirigir todo a index.php
-RewriteRule ^(.*)$ index.php [QSA,L]
+# Redirigir todo a index.php (incluyendo URLs con barras diagonales al final)
+RewriteRule ^(.*)/?$ index.php [QSA,L]
 
 # Seguridad: bloquear acceso directo a archivos sensibles
 <FilesMatch "\.(json|md|log)$">
