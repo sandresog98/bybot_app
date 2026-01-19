@@ -5,17 +5,23 @@
 
 RewriteEngine On
 
-# Permitir acceso directo a index.php y otros archivos PHP
-RewriteCond %{REQUEST_FILENAME} -f
-RewriteRule \.(php)$ - [L]
+# Desactivar el listado de directorios (evita 403 en directorios)
+Options -Indexes
 
-# Si el archivo o directorio existe, no reescribir
+# Permitir acceso directo a archivos físicos (PHP, CSS, JS, imágenes, etc.)
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+# Permitir acceso directo a directorios físicos (pero no listarlos)
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Redirigir todas las solicitudes a index.php
+# Maneja tanto URLs con como sin barra diagonal al final
+# La barra diagonal al final se maneja internamente, no requiere redirect
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-
-# Redirigir todo a index.php (incluyendo URLs con barras diagonales al final)
-# Usar [PT] (Pass Through) para que Apache procese la URL como si fuera un archivo
-RewriteRule ^(.*)/?$ index.php [PT,QSA,L]
+RewriteRule ^(.*)/?$ index.php [QSA,L]
 
 # Seguridad: bloquear acceso directo a archivos sensibles
 <FilesMatch "\.(json|md|log)$">
