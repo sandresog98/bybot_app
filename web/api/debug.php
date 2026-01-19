@@ -9,6 +9,12 @@ header('Content-Type: application/json');
 try {
     // Cargar configuración base
     require_once dirname(__DIR__, 2) . '/config/constants.php';
+    
+    // Verificar que BASE_DIR esté definido
+    if (!defined('BASE_DIR')) {
+        throw new Exception('BASE_DIR no está definido. Verifica constants.php');
+    }
+    
     require_once BASE_DIR . '/web/core/Response.php';
     
     // Obtener método y path

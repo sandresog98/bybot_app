@@ -12,6 +12,7 @@ require_once __DIR__ . '/env_loader.php';
 // RUTAS DEL SISTEMA
 // =============================================
 define('BYBOT_ROOT', dirname(__DIR__));
+define('BASE_DIR', BYBOT_ROOT); // Alias para compatibilidad
 define('BYBOT_CONFIG', BYBOT_ROOT . '/config');
 define('BYBOT_WEB', BYBOT_ROOT . '/web');
 define('BYBOT_SERVICES', BYBOT_ROOT . '/services');
