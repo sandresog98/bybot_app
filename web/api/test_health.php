@@ -10,11 +10,16 @@ try {
     require_once dirname(__DIR__, 2) . '/config/constants.php';
     require_once BASE_DIR . '/web/core/Response.php';
     
+    // Verificar constantes
+    if (!defined('APP_VERSION')) {
+        throw new Exception('APP_VERSION no está definido');
+    }
+    
     // Simular el endpoint health
     echo json_encode([
         'status' => 'ok',
         'timestamp' => date('c'),
-        'version' => APP_VERSION ?? '1.0.0',
+        'version' => APP_VERSION,
         'environment' => APP_ENV ?? 'production',
         'message' => 'Health check funcionando'
     ], JSON_PRETTY_PRINT);

@@ -28,6 +28,8 @@ define('APP_ENV', env('APP_ENV', 'development'));
 define('APP_DEBUG', env('APP_DEBUG', 'true') === 'true');
 define('APP_URL', env('APP_URL', 'https://bybjuridicos.andapps.cloud'));
 define('APP_NAME', env('APP_NAME', 'ByBot'));
+define('APP_VERSION', env('APP_VERSION', '2.0.0'));
+define('BASE_URL', APP_URL); // Alias para compatibilidad
 
 // =============================================
 // ESTADOS DE PROCESO

@@ -187,7 +187,7 @@ try {
             Response::json([
                 'status' => 'ok',
                 'timestamp' => date('c'),
-                'version' => APP_VERSION ?? '1.0.0',
+                'version' => defined('APP_VERSION') ? APP_VERSION : '2.0.0',
                 'environment' => APP_ENV ?? 'production'
             ]);
             break;
@@ -212,7 +212,7 @@ try {
                     '/api/v1/stats' => 'Estadísticas',
                     '/api/v1/health' => 'Health check'
                 ],
-                'documentation' => BASE_URL . '/docs'
+                'documentation' => (defined('BASE_URL') ? BASE_URL : APP_URL) . '/docs'
             ]);
             break;
             
