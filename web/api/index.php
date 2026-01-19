@@ -50,6 +50,9 @@ $path = trim($path, '/');
 $path = str_replace('index.php', '', $path);
 $path = trim($path, '/');
 
+// Limpiar cualquier carácter inválido que pueda quedar (como ? o &)
+$path = preg_replace('/[?&].*$/', '', $path);
+
 // Si el path está vacío o es solo "index.php", intentar obtener desde REQUEST_URI
 if (empty($path) || $path === 'index.php') {
     // Si hay un parámetro 'resource' en GET, usarlo (para debugging)
@@ -114,36 +117,23 @@ if (empty($body) && !empty($_POST)) {
     $body = $_POST;
 }
 
-// Debug info (solo en desarrollo o con parámetro debug)
-if ((defined('APP_DEBUG') && APP_DEBUG) || isset($_GET['debug'])) {
+// Debug info (solo cuando se solicita explícitamente con ?debug=1)
+// No interrumpir el flujo normal, solo agregar headers de debug
+if (isset($_GET['debug']) && $_GET['debug'] === '1' && defined('APP_DEBUG') && APP_DEBUG) {
     // Iniciar sesión para debug
     if (session_status() === PHP_SESSION_NONE) {
         session_start();
     }
     
-    Response::json([
-        'debug' => true,
-        'method' => $method,
-        'request_uri' => $requestUri,
-        'script_name' => $_SERVER['SCRIPT_NAME'] ?? null,
-        'parsed_path' => $parsedPath,
-        'base_path' => $basePath,
-        'path' => $path,
-        'version' => $version,
-        'resource' => $resource,
-        'id' => $id,
-        'action' => $action,
-        'segments' => $segments,
-        'query_string' => $_SERVER['QUERY_STRING'] ?? null,
-        'get_params' => $_GET,
-        'session' => [
-            'id' => session_id(),
-            'status' => session_status(),
-            'has_user_id' => isset($_SESSION['user_id']),
-            'user_id' => $_SESSION['user_id'] ?? null,
-            'cookie_params' => session_get_cookie_params()
-        ]
-    ]);
+    // Agregar información de debug como headers (no interrumpe la respuesta)
+    header('X-Debug-Method: ' . $method);
+    header('X-Debug-Resource: ' . $resource);
+    header('X-Debug-Path: ' . $path);
+    header('X-Debug-Version: ' . $version);
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        header('X-Debug-Session-Id: ' . session_id());
+        header('X-Debug-User-Id: ' . ($_SESSION['user_id'] ?? 'null'));
+    }
 }
 
 // Router principal
