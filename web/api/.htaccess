@@ -5,31 +5,19 @@
 
 RewriteEngine On
 
-# Desactivar el listado de directorios (evita 403 en directorios)
+# Desactivar listado de directorios
 Options -Indexes
 
-# Prevenir que Apache agregue barras diagonales automáticamente
-DirectorySlash Off
-
-# Deshabilitar DirectoryIndex para evitar que busque index en subdirectorios
-DirectoryIndex disabled
-
-# Permitir acceso directo a archivos físicos (PHP, CSS, JS, imágenes, etc.)
+# Permitir acceso directo a archivos físicos
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^ - [L]
 
-# IMPORTANTE: No permitir que Apache trate las rutas como directorios
-# Esto previene que URLs como /procesos/ sean interpretadas como directorios
-# y generen 403 antes de llegar a las reglas de reescritura
-
-# Redirigir todas las solicitudes a index.php
-# Maneja tanto URLs con como sin barra diagonal al final
-# Usar [PT] (Pass Through) para que Apache procese la URL como si fuera un archivo
+# Enviar todo lo demás a index.php
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^(.*)$ index.php [PT,QSA,L]
+RewriteRule ^ index.php [L,QSA]
 
-# Seguridad: bloquear acceso directo a archivos sensibles
+# Proteger archivos sensibles
 <FilesMatch "\.(json|md|log)$">
     <IfModule mod_authz_core.c>
         Require all denied
