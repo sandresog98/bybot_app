@@ -286,10 +286,19 @@ async function loadDashboardStats() {
             credentials: 'include'
         });
         
-        if (!response.ok) throw new Error('Error cargando estadísticas');
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: Error cargando estadísticas`);
+        }
         
         const data = await response.json();
-        const stats = data.data;
+        
+        // Validar estructura de respuesta
+        if (!data || !data.data) {
+            console.error('Respuesta inválida:', data);
+            throw new Error('Estructura de respuesta inválida');
+        }
+        
+        const stats = data.data || {};
         
         // Actualizar tarjetas
         document.getElementById('statTotalProcesos').textContent = stats.total_procesos || 0;
@@ -458,10 +467,19 @@ async function loadColasStatus() {
             credentials: 'include'
         });
         
-        if (!response.ok) throw new Error('Error');
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: Error cargando colas`);
+        }
         
         const data = await response.json();
-        const colas = data.data;
+        
+        // Validar estructura de respuesta
+        if (!data || !data.data) {
+            console.error('Respuesta inválida:', data);
+            throw new Error('Estructura de respuesta inválida');
+        }
+        
+        const colas = data.data || {};
         
         // Estado de Redis
         const redisStatus = document.getElementById('redisStatus');
@@ -503,12 +521,26 @@ async function loadActividadReciente() {
             credentials: 'include'
         });
         
-        if (!response.ok) throw new Error('Error');
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: Error cargando actividad`);
+        }
         
         const data = await response.json();
-        const actividad = data.data;
         
+        // Validar estructura de respuesta
+        if (!data || !data.data) {
+            console.error('Respuesta inválida:', data);
+            const container = document.getElementById('actividadReciente');
+            if (container) {
+                container.innerHTML = '<div class="text-center text-muted py-4"><small>Error cargando actividad</small></div>';
+            }
+            return;
+        }
+        
+        const actividad = data.data || [];
         const container = document.getElementById('actividadReciente');
+        
+        if (!container) return;
         
         if (actividad.length === 0) {
             container.innerHTML = '<div class="text-center text-muted py-4"><small>No hay actividad reciente</small></div>';
@@ -540,8 +572,9 @@ async function loadPendientesValidacion() {
     
     try {
         // Usar URL sin barra diagonal al final para evitar problemas de parsing
-        const url = CONFIG.apiUrl + '/procesos?estado=analizado&per_page=5';
-        const response = await fetch(url, {
+        // Intentar primero sin barra diagonal
+        let url = CONFIG.apiUrl + '/procesos?estado=analizado&per_page=5';
+        let response = await fetch(url, {
             credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
@@ -549,13 +582,16 @@ async function loadPendientesValidacion() {
             }
         });
         
+        // Si falla con 403, puede ser problema de Apache bloqueando
+        // Intentar con la URL completa incluyendo el path base
+        if (!response.ok && response.status === 403) {
+            console.warn('Error 403 detectado, puede ser problema de configuración de Apache');
+            // Mostrar mensaje informativo
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-warning py-4"><small>No se pueden cargar los procesos pendientes. Verifica la configuración del servidor.</small></td></tr>';
+            return;
+        }
+        
         if (!response.ok) {
-            // Si es 403, puede ser problema de sesión
-            if (response.status === 403) {
-                console.warn('Error 403: Puede ser problema de sesión. Intenta hacer logout y login nuevamente.');
-                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-warning py-4"><small>Error de autenticación. Por favor, recarga la página.</small></td></tr>';
-                return;
-            }
             throw new Error(`HTTP ${response.status}`);
         }
         
