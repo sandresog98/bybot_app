@@ -27,7 +27,7 @@ $userRol = $user['rol'] ?? 'operador';
     <title><?= htmlspecialchars($pageTitle) ?> - ByBot</title>
     
     <!-- Favicon -->
-    <link rel="icon" type="image/x-icon" href="<?= assetUrl('favicons/favicon.ico') ?>">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     
     <!-- Bootstrap 5.3 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">

@@ -118,11 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title>Iniciar Sesión - ByBot</title>
     
     <!-- Favicon -->
-    <?php if (defined('ASSETS_URL')): ?>
-        <link rel="icon" type="image/x-icon" href="<?= assetUrl('favicons/favicon.ico') ?>">
-    <?php else: ?>
-        <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <?php endif; ?>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     
     <!-- Bootstrap 5.3 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
