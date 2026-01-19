@@ -32,7 +32,13 @@ class Response {
     /**
      * Respuesta paginada
      */
-    public static function paginated($data, $pagination, $message = 'Datos obtenidos') {
+    public static function paginated($data, $total, $page, $perPage, $message = 'Datos obtenidos') {
+        $pagination = [
+            'page' => $page,
+            'per_page' => $perPage,
+            'total' => $total,
+            'total_pages' => ceil($total / $perPage)
+        ];
         return [
             'success' => true,
             'message' => $message,
@@ -40,6 +46,13 @@ class Response {
             'pagination' => $pagination,
             'code' => 200
         ];
+    }
+    
+    /**
+     * Enviar respuesta paginada JSON
+     */
+    public static function jsonPaginated($data, $total, $page, $perPage, $message = 'Datos obtenidos') {
+        self::json(self::paginated($data, $total, $page, $perPage, $message));
     }
     
     /**

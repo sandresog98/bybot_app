@@ -15,7 +15,7 @@ function routeStats(string $method, ?string $id, array $body): void {
     RateLimitMiddleware::checkApi();
     
     if ($method !== 'GET') {
-        Response::error('Método no permitido', [], 405);
+        Response::methodNotAllowed('Método no permitido');
     }
     
     switch ($id) {
@@ -43,7 +43,7 @@ function routeStats(string $method, ?string $id, array $body): void {
             break;
             
         default:
-            Response::error('Estadística no encontrada', [], 404);
+            Response::notFound('Estadística no encontrada');
     }
 }
 
@@ -136,7 +136,7 @@ function handleDashboard(): void {
     ");
     $stats['actividad_reciente'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    Response::success('Estadísticas de dashboard', $stats);
+    Response::jsonSuccess($stats, 'Estadísticas de dashboard');
 }
 
 /**
@@ -192,7 +192,7 @@ function handleProcesoStats(): void {
     ");
     $stats['distribucion_tiempos'] = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
     
-    Response::success('Estadísticas de procesos', $stats);
+    Response::jsonSuccess($stats, 'Estadísticas de procesos');
 }
 
 /**
@@ -240,7 +240,7 @@ function handleUsuarioStats(): void {
     ");
     $stats['logins_hoy'] = (int) $stmt->fetchColumn();
     
-    Response::success('Estadísticas de usuarios', $stats);
+    Response::jsonSuccess($stats, 'Estadísticas de usuarios');
 }
 
 /**
@@ -273,7 +273,7 @@ function handleActividadReciente(): void {
     $stmt->execute([$limit]);
     $actividad = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    Response::success('Actividad reciente', $actividad);
+    Response::jsonSuccess($actividad, 'Actividad reciente');
 }
 
 /**
@@ -327,6 +327,6 @@ function handleRendimiento(): void {
     ");
     $stats['tiempos_promedio_min'] = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    Response::success('Métricas de rendimiento', $stats);
+    Response::jsonSuccess($stats, 'Métricas de rendimiento');
 }
 

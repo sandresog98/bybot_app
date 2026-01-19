@@ -12,12 +12,19 @@
     <script src="<?= assetUrl('js/admin.js') ?>"></script>
     
     <script>
-        // Configuración global
-        const CONFIG = {
-            apiUrl: '<?= API_URL ?>',
-            adminUrl: '<?= ADMIN_URL ?>',
-            csrfToken: '<?= generateCsrfToken() ?>'
-        };
+        // Configuración global (solo si no existe ya)
+        if (typeof CONFIG === 'undefined') {
+            var CONFIG = {
+                apiUrl: '<?= API_URL ?>',
+                adminUrl: '<?= ADMIN_URL ?>',
+                csrfToken: '<?= generateCsrfToken() ?>'
+            };
+        } else {
+            // Actualizar valores si CONFIG ya existe
+            CONFIG.apiUrl = '<?= API_URL ?>';
+            CONFIG.adminUrl = '<?= ADMIN_URL ?>';
+            CONFIG.csrfToken = '<?= generateCsrfToken() ?>';
+        }
         
         // Inicialización
         document.addEventListener('DOMContentLoaded', function() {

@@ -18,7 +18,7 @@ function routeColas(string $method, ?string $id, array $body): void {
         case 'estado':
         case 'status':
             if ($method !== 'GET') {
-                Response::error('Método no permitido', [], 405);
+                Response::methodNotAllowed('Método no permitido');
             }
             handleEstado();
             break;
@@ -26,7 +26,7 @@ function routeColas(string $method, ?string $id, array $body): void {
         case 'encolar':
         case 'push':
             if ($method !== 'POST') {
-                Response::error('Método no permitido', [], 405);
+                Response::methodNotAllowed('Método no permitido');
             }
             AuthMiddleware::requireRole('admin');
             handleEncolar($body);
@@ -35,7 +35,7 @@ function routeColas(string $method, ?string $id, array $body): void {
         case 'trabajos':
         case 'jobs':
             if ($method !== 'GET') {
-                Response::error('Método no permitido', [], 405);
+                Response::methodNotAllowed('Método no permitido');
             }
             handleListarTrabajos();
             break;
@@ -43,14 +43,14 @@ function routeColas(string $method, ?string $id, array $body): void {
         case 'limpiar':
         case 'clear':
             if ($method !== 'POST') {
-                Response::error('Método no permitido', [], 405);
+                Response::methodNotAllowed('Método no permitido');
             }
             AuthMiddleware::requireRole('admin');
             handleLimpiar($body);
             break;
             
         default:
-            Response::error('Ruta no encontrada', [], 404);
+            Response::notFound('Ruta no encontrada');
     }
 }
 
@@ -105,7 +105,7 @@ function handleEstado(): void {
     ");
     $estado['en_progreso'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    Response::success('Estado de colas', $estado);
+    Response::jsonSuccess($estado, 'Estado de colas');
 }
 
 /**
@@ -114,16 +114,16 @@ function handleEstado(): void {
  */
 function handleEncolar(array $body): void {
     if (empty($body['cola'])) {
-        Response::error('cola es requerido', [], 400);
+        Response::jsonError('cola es requerido', 400);
     }
     
     if (empty($body['payload'])) {
-        Response::error('payload es requerido', [], 400);
+        Response::jsonError('payload es requerido', 400);
     }
     
     $colasPermitidas = ['bybot:analyze', 'bybot:fill', 'bybot:notify'];
     if (!in_array($body['cola'], $colasPermitidas)) {
-        Response::error('Cola no permitida: ' . $body['cola'], [], 400);
+        Response::jsonError('Cola no permitida: ' . $body['cola'], 400);
     }
     
     try {
@@ -149,14 +149,14 @@ function handleEncolar(array $body): void {
             $body['proceso_id'] ?? null
         ]);
         
-        Response::success('Trabajo encolado', [
+        Response::jsonSuccess([
             'job_id' => $jobId,
             'cola' => $body['cola'],
             'posicion' => $resultado
-        ]);
+        ], 'Trabajo encolado');
         
     } catch (Exception $e) {
-        Response::error('Error encolando trabajo: ' . $e->getMessage(), [], 500);
+        Response::serverError('Error encolando trabajo: ' . $e->getMessage());
     }
 }
 
@@ -208,7 +208,7 @@ function handleListarTrabajos(): void {
             : null;
     }
     
-    Response::success('Trabajos en cola', $trabajos);
+    Response::jsonSuccess($trabajos, 'Trabajos en cola');
 }
 
 /**
@@ -217,7 +217,7 @@ function handleListarTrabajos(): void {
  */
 function handleLimpiar(array $body): void {
     if (empty($body['cola'])) {
-        Response::error('cola es requerido', [], 400);
+        Response::jsonError('cola es requerido', 400);
     }
     
     try {
@@ -226,13 +226,13 @@ function handleLimpiar(array $body): void {
         
         $eliminados = $queue->clear($body['cola']);
         
-        Response::success('Cola limpiada', [
+        Response::jsonSuccess([
             'cola' => $body['cola'],
             'trabajos_eliminados' => $eliminados
-        ]);
+        ], 'Cola limpiada');
         
     } catch (Exception $e) {
-        Response::error('Error limpiando cola: ' . $e->getMessage(), [], 500);
+        Response::serverError('Error limpiando cola: ' . $e->getMessage());
     }
 }
 

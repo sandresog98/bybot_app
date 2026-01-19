@@ -45,7 +45,7 @@ function routeProcesos(string $method, ?string $id, ?string $action, array $body
             } elseif ($method === 'POST') {
                 handleCrear($body, $service);
             } else {
-                Response::error('Método no permitido', [], 405);
+                Response::methodNotAllowed('Método no permitido');
             }
             break;
             
@@ -54,7 +54,7 @@ function routeProcesos(string $method, ?string $id, ?string $action, array $body
             if ($method === 'GET') {
                 handleBuscarPorCodigo($id, $service);
             } else {
-                Response::error('Proceso no encontrado', [], 404);
+                Response::notFound('Proceso no encontrado');
             }
     }
 }
@@ -70,7 +70,7 @@ function routeProcesoById(int $id, string $method, ?string $action, array $body,
         // GET /procesos/{id}/historial
         case 'historial':
             if ($method !== 'GET') {
-                Response::error('Método no permitido', [], 405);
+                Response::methodNotAllowed('Método no permitido');
             }
             handleHistorial($id, $service);
             break;
@@ -78,7 +78,7 @@ function routeProcesoById(int $id, string $method, ?string $action, array $body,
         // POST /procesos/{id}/encolar-analisis
         case 'encolar-analisis':
             if ($method !== 'POST') {
-                Response::error('Método no permitido', [], 405);
+                Response::methodNotAllowed('Método no permitido');
             }
             AuthMiddleware::requireAccess('procesos.editar_ia');
             handleEncolarAnalisis($id, $service);
@@ -87,7 +87,7 @@ function routeProcesoById(int $id, string $method, ?string $action, array $body,
         // POST /procesos/{id}/encolar-llenado
         case 'encolar-llenado':
             if ($method !== 'POST') {
-                Response::error('Método no permitido', [], 405);
+                Response::methodNotAllowed('Método no permitido');
             }
             AuthMiddleware::requireAccess('procesos.editar_ia');
             handleEncolarLlenado($id, $service);
@@ -96,7 +96,7 @@ function routeProcesoById(int $id, string $method, ?string $action, array $body,
         // POST /procesos/{id}/cancelar
         case 'cancelar':
             if ($method !== 'POST') {
-                Response::error('Método no permitido', [], 405);
+                Response::methodNotAllowed('Método no permitido');
             }
             AuthMiddleware::requireAccess('procesos.editar_ia');
             handleCancelar($id, $body, $service);
@@ -105,7 +105,7 @@ function routeProcesoById(int $id, string $method, ?string $action, array $body,
         // POST /procesos/{id}/estado
         case 'estado':
             if ($method !== 'POST' && $method !== 'PUT') {
-                Response::error('Método no permitido', [], 405);
+                Response::methodNotAllowed('Método no permitido');
             }
             AuthMiddleware::requireAccess('procesos.editar_ia');
             handleCambiarEstado($id, $body, $service);
@@ -128,12 +128,12 @@ function routeProcesoById(int $id, string $method, ?string $action, array $body,
                     handleEliminar($id, $service);
                     break;
                 default:
-                    Response::error('Método no permitido', [], 405);
+                    Response::methodNotAllowed('Método no permitido');
             }
             break;
             
         default:
-            Response::error("Acción no encontrada: {$action}", [], 404);
+            Response::notFound("Acción no encontrada: {$action}");
     }
 }
 
@@ -181,7 +181,7 @@ function handleListar(ProcesoService $service): void {
     
     $result = $service->listar($filters, $page, $perPage);
     
-    Response::paginated(
+    Response::jsonPaginated(
         $result['items'],
         $result['pagination']['total'],
         $page,
@@ -201,10 +201,10 @@ function handleCrear(array $body, ProcesoService $service): void {
     
     try {
         $proceso = $service->crear($body, $userId);
-        Response::success('Proceso creado exitosamente', $proceso, 201);
+        Response::created($proceso, 'Proceso creado exitosamente');
     } catch (InvalidArgumentException $e) {
         $errors = json_decode($e->getMessage(), true);
-        Response::error('Error de validación', $errors ?: ['general' => $e->getMessage()], 400);
+        Response::validationError($errors ?: ['general' => $e->getMessage()], 'Error de validación');
     }
 }
 
@@ -219,7 +219,7 @@ function handleObtener(int $id, ProcesoService $service): void {
         Response::error('Proceso no encontrado', [], 404);
     }
     
-    Response::success('Proceso obtenido', $proceso);
+    Response::jsonSuccess($proceso, 'Proceso obtenido');
 }
 
 /**
@@ -233,7 +233,7 @@ function handleBuscarPorCodigo(string $codigo, ProcesoService $service): void {
         Response::error('Proceso no encontrado', [], 404);
     }
     
-    Response::success('Proceso obtenido', $proceso);
+    Response::jsonSuccess($proceso, 'Proceso obtenido');
 }
 
 /**
@@ -245,10 +245,10 @@ function handleActualizar(int $id, array $body, ProcesoService $service): void {
     
     try {
         $proceso = $service->actualizar($id, $body, $userId);
-        Response::success('Proceso actualizado', $proceso);
+        Response::jsonSuccess($proceso, 'Proceso actualizado');
     } catch (InvalidArgumentException $e) {
         $errors = json_decode($e->getMessage(), true);
-        Response::error($errors['message'] ?? 'Error de validación', $errors ?: [], 400);
+        Response::validationError($errors ?: [], $errors['message'] ?? 'Error de validación');
     }
 }
 
@@ -261,9 +261,9 @@ function handleEliminar(int $id, ProcesoService $service): void {
     
     try {
         $service->eliminar($id, $userId);
-        Response::success('Proceso eliminado');
+        Response::jsonSuccess(null, 'Proceso eliminado');
     } catch (InvalidArgumentException $e) {
-        Response::error($e->getMessage(), [], 400);
+        Response::jsonError($e->getMessage(), 400);
     }
 }
 
@@ -274,10 +274,10 @@ function handleEliminar(int $id, ProcesoService $service): void {
 function handleEstados(): void {
     require_once BASE_DIR . '/web/modules/procesos/models/Proceso.php';
     
-    Response::success('Estados disponibles', [
+    Response::jsonSuccess([
         'estados' => Proceso::ESTADOS,
         'tipos' => Proceso::TIPOS
-    ]);
+    ], 'Estados disponibles');
 }
 
 /**
@@ -296,7 +296,7 @@ function handleEstadisticas(ProcesoService $service): void {
     
     $stats = $service->getEstadisticas($userId, $fechaDesde, $fechaHasta);
     
-    Response::success('Estadísticas de procesos', $stats);
+    Response::jsonSuccess($stats, 'Estadísticas de procesos');
 }
 
 /**
@@ -307,7 +307,7 @@ function handleHistorial(int $id, ProcesoService $service): void {
     $limit = min(100, max(1, (int)($_GET['limit'] ?? 50)));
     $historial = $service->getHistorial($id, $limit);
     
-    Response::success('Historial del proceso', $historial);
+    Response::jsonSuccess($historial, 'Historial del proceso');
 }
 
 /**
@@ -319,9 +319,9 @@ function handleEncolarAnalisis(int $id, ProcesoService $service): void {
     
     try {
         $proceso = $service->encolarAnalisis($id, $userId);
-        Response::success('Proceso encolado para análisis', $proceso);
+        Response::jsonSuccess($proceso, 'Proceso encolado para análisis');
     } catch (InvalidArgumentException $e) {
-        Response::error($e->getMessage(), [], 400);
+        Response::jsonError($e->getMessage(), 400);
     }
 }
 
@@ -334,9 +334,9 @@ function handleEncolarLlenado(int $id, ProcesoService $service): void {
     
     try {
         $proceso = $service->encolarLlenado($id, $userId);
-        Response::success('Proceso encolado para llenado', $proceso);
+        Response::jsonSuccess($proceso, 'Proceso encolado para llenado');
     } catch (InvalidArgumentException $e) {
-        Response::error($e->getMessage(), [], 400);
+        Response::jsonError($e->getMessage(), 400);
     }
 }
 
@@ -350,9 +350,9 @@ function handleCancelar(int $id, array $body, ProcesoService $service): void {
     
     try {
         $proceso = $service->cancelar($id, $userId, $motivo);
-        Response::success('Proceso cancelado', $proceso);
+        Response::jsonSuccess($proceso, 'Proceso cancelado');
     } catch (InvalidArgumentException $e) {
-        Response::error($e->getMessage(), [], 400);
+        Response::jsonError($e->getMessage(), 400);
     }
 }
 
@@ -364,16 +364,16 @@ function handleCambiarEstado(int $id, array $body, ProcesoService $service): voi
     $userId = AuthMiddleware::getCurrentUserId();
     
     if (empty($body['estado'])) {
-        Response::error('El campo estado es requerido', [], 400);
+        Response::jsonError('El campo estado es requerido', 400);
     }
     
     $mensaje = $body['mensaje'] ?? null;
     
     try {
         $proceso = $service->cambiarEstado($id, $body['estado'], $userId, $mensaje);
-        Response::success('Estado actualizado', $proceso);
+        Response::jsonSuccess($proceso, 'Estado actualizado');
     } catch (InvalidArgumentException $e) {
-        Response::error($e->getMessage(), [], 400);
+        Response::jsonError($e->getMessage(), 400);
     }
 }
 
