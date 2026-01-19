@@ -12,19 +12,34 @@
     <script src="<?= assetUrl('js/admin.js') ?>"></script>
     
     <script>
+        // Función helper para normalizar URLs (remover barras duplicadas)
+        function normalizeUrl(base, endpoint) {
+            // Remover barras finales del base
+            base = base.replace(/\/+$/, '');
+            // Remover barras iniciales del endpoint
+            endpoint = endpoint.replace(/^\/+/, '');
+            // Construir URL sin barras duplicadas
+            return base + '/' + endpoint;
+        }
+        
         // Configuración global (solo si no existe ya)
         if (typeof CONFIG === 'undefined') {
             var CONFIG = {
-                apiUrl: '<?= API_URL ?>',
-                adminUrl: '<?= ADMIN_URL ?>',
+                apiUrl: '<?= rtrim(API_URL, '/') ?>',
+                adminUrl: '<?= rtrim(ADMIN_URL, '/') ?>',
                 csrfToken: '<?= generateCsrfToken() ?>'
             };
         } else {
             // Actualizar valores si CONFIG ya existe
-            CONFIG.apiUrl = '<?= API_URL ?>';
-            CONFIG.adminUrl = '<?= ADMIN_URL ?>';
+            CONFIG.apiUrl = '<?= rtrim(API_URL, '/') ?>';
+            CONFIG.adminUrl = '<?= rtrim(ADMIN_URL, '/') ?>';
             CONFIG.csrfToken = '<?= generateCsrfToken() ?>';
         }
+        
+        // Agregar función helper al CONFIG
+        CONFIG.apiUrlFor = function(endpoint) {
+            return normalizeUrl(this.apiUrl, endpoint);
+        };
         
         // Inicialización
         document.addEventListener('DOMContentLoaded', function() {
@@ -59,7 +74,7 @@
         // Cargar estado de colas para el sidebar
         async function loadQueueStatus() {
             try {
-                const response = await fetch(CONFIG.apiUrl + '/colas/estado', {
+                const response = await fetch(CONFIG.apiUrlFor('colas/estado'), {
                     credentials: 'include'
                 });
                 if (response.ok) {

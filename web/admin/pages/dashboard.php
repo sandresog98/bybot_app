@@ -282,7 +282,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function loadDashboardStats() {
     try {
-        const response = await fetch(CONFIG.apiUrl + '/stats/dashboard', {
+        const response = await fetch(CONFIG.apiUrlFor('stats/dashboard'), {
             credentials: 'include'
         });
         
@@ -463,7 +463,7 @@ function updateChartDistribucion(porEstado) {
 
 async function loadColasStatus() {
     try {
-        const response = await fetch(CONFIG.apiUrl + '/colas/estado', {
+        const response = await fetch(CONFIG.apiUrlFor('colas/estado'), {
             credentials: 'include'
         });
         
@@ -517,7 +517,7 @@ async function loadColasStatus() {
 
 async function loadActividadReciente() {
     try {
-        const response = await fetch(CONFIG.apiUrl + '/stats/actividad?limit=8', {
+        const response = await fetch(CONFIG.apiUrlFor('stats/actividad') + '?limit=8', {
             credentials: 'include'
         });
         
@@ -571,9 +571,8 @@ async function loadPendientesValidacion() {
     if (!tbody) return;
     
     try {
-        // Usar URL sin barra diagonal al final para evitar problemas de parsing
-        // Intentar primero sin barra diagonal
-        let url = CONFIG.apiUrl + '/procesos?estado=analizado&per_page=5';
+        // Construir URL usando la función helper para evitar barras duplicadas
+        let url = CONFIG.apiUrlFor('procesos') + '?estado=analizado&per_page=5';
         let response = await fetch(url, {
             credentials: 'include',
             headers: {
