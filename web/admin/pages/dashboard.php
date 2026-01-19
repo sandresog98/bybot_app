@@ -99,8 +99,8 @@ include ADMIN_LAYOUTS . '/header.php';
                     <button class="btn btn-outline-secondary" data-chart-range="month">Mes</button>
                 </div>
             </div>
-            <div class="card-body">
-                <canvas id="chartProcesos" height="280"></canvas>
+            <div class="card-body" style="height: 300px; position: relative;">
+                <canvas id="chartProcesos"></canvas>
             </div>
         </div>
     </div>
@@ -111,8 +111,8 @@ include ADMIN_LAYOUTS . '/header.php';
             <div class="card-header">
                 <i class="bi bi-pie-chart me-2"></i>Distribución Actual
             </div>
-            <div class="card-body">
-                <canvas id="chartDistribucion" height="220"></canvas>
+            <div class="card-body" style="height: 300px; position: relative;">
+                <canvas id="chartDistribucion"></canvas>
                 <div class="mt-3" id="legendaEstados"></div>
             </div>
         </div>
@@ -363,7 +363,8 @@ function updateChartProcesos(porEstado) {
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false,
+                maintainAspectRatio: true,
+                aspectRatio: 2,
                 plugins: {
                     legend: {
                         display: false
@@ -423,7 +424,8 @@ function updateChartDistribucion(porEstado) {
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false,
+                maintainAspectRatio: true,
+                aspectRatio: 1,
                 plugins: {
                     legend: {
                         display: false
@@ -537,17 +539,34 @@ async function loadPendientesValidacion() {
     if (!tbody) return;
     
     try {
-        const response = await fetch(CONFIG.apiUrl + '/procesos?estado=analizado&per_page=5', {
+        // Usar URL sin barra diagonal al final para evitar problemas de parsing
+        const url = CONFIG.apiUrl + '/procesos?estado=analizado&per_page=5';
+        const response = await fetch(url, {
             credentials: 'include',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
             }
         });
         
-        if (!response.ok) throw new Error('Error');
+        if (!response.ok) {
+            // Si es 403, puede ser problema de sesión
+            if (response.status === 403) {
+                console.warn('Error 403: Puede ser problema de sesión. Intenta hacer logout y login nuevamente.');
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-warning py-4"><small>Error de autenticación. Por favor, recarga la página.</small></td></tr>';
+                return;
+            }
+            throw new Error(`HTTP ${response.status}`);
+        }
         
         const data = await response.json();
-        const procesos = data.data;
+        
+        // Verificar estructura de respuesta
+        if (!data || !data.data) {
+            throw new Error('Respuesta inválida');
+        }
+        
+        const procesos = data.data || [];
         
         document.getElementById('countPendientes').textContent = data.pagination?.total || 0;
         
@@ -575,7 +594,8 @@ async function loadPendientesValidacion() {
         `).join('');
         
     } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-4">Error cargando datos</td></tr>';
+        console.error('Error cargando pendientes de validación:', error);
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-4"><small>Error cargando datos. Intenta recargar la página.</small></td></tr>';
     }
 }
 
