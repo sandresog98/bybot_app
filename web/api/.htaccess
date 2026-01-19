@@ -1,6 +1,6 @@
 # =============================================
 # .htaccess - ByBot API
-# Redirige todas las solicitudes al router principal
+# Compatible con Apache y LiteSpeed
 # =============================================
 
 RewriteEngine On
@@ -8,14 +8,21 @@ RewriteEngine On
 # Desactivar listado de directorios
 Options -Indexes
 
+# Para LiteSpeed: Permitir que las rutas con barra diagonal pasen al router
+# Sin esto, LiteSpeed puede bloquear URLs como /procesos/?estado=...
+<IfModule LiteSpeed>
+RewriteRule .* - [E=noabort:1,E=noconntimeout:1]
+</IfModule>
+
 # Permitir acceso directo a archivos físicos
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^ - [L]
 
 # Enviar todo lo demás a index.php
+# Usar patrón más específico para LiteSpeed
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^ index.php [L,QSA]
+RewriteRule ^(.*)$ index.php [L,QSA]
 
 # Proteger archivos sensibles
 <FilesMatch "\.(json|md|log)$">
