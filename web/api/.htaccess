@@ -5,9 +5,6 @@
 
 RewriteEngine On
 
-# Detectar base automáticamente (comentado para que funcione en cualquier path)
-# RewriteBase se detecta automáticamente desde la ubicación del .htaccess
-
 # Si el archivo o directorio existe, no reescribir
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
@@ -16,19 +13,15 @@ RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^(.*)$ index.php [QSA,L]
 
 # Seguridad: bloquear acceso directo a archivos sensibles
-<FilesMatch "\.(php|json|md|log)$">
+<FilesMatch "\.(json|md|log)$">
     <IfModule mod_authz_core.c>
-        # Apache 2.4+
         Require all denied
     </IfModule>
-</FilesMatch>
-
-# Permitir solo index.php
-<Files "index.php">
-    <IfModule mod_authz_core.c>
-        Require all granted
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Deny from all
     </IfModule>
-</Files>
+</FilesMatch>
 
 # Headers de seguridad
 <IfModule mod_headers.c>
