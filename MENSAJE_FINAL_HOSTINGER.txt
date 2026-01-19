@@ -1,19 +1,16 @@
-# Mensaje Corto para Hostinger
-
-```
 Hola,
 
-El WAF/mod_security de LiteSpeed bloquea /web/api/v1/procesos con 403.
+El WAF/mod_security bloquea /web/api/v1/procesos con 403.
 
 Funcionan: /web/api/v1/stats/dashboard, /web/api/v1/colas/estado
 Falla: /web/api/v1/procesos?estado=analizado&per_page=5
 
 El 403 es HTML de LiteSpeed (no pasa por PHP). Solo /procesos falla.
 
-Ruta .htaccess: /public_html/bybjuridicos/web/api/.htaccess
-Contenido: RewriteEngine On, Options -Indexes, RewriteRule ^(.*)$ index.php [L,QSA]
+.htaccess: /public_html/bybjuridicos/web/api/.htaccess
+RewriteEngine On, Options -Indexes, RewriteRule ^(.*)$ index.php [L,QSA]
 
 ¿Pueden revisar logs del WAF y excluir /web/api/v1/procesos del bloqueo?
 
 Gracias.
-```
+

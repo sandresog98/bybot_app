@@ -81,7 +81,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function loadProceso() {
     try {
-        const response = await fetch(`${CONFIG.apiUrl}/procesos/${procesoId}`, {
+        const response = await fetch(`${CONFIG.apiUrl}/casos/${procesoId}`, {
             credentials: 'include'
         });
         

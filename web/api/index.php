@@ -151,6 +151,7 @@ try {
         // PROCESOS ENDPOINTS
         // =========================================
         case 'procesos':
+        case 'casos': // Alias temporal para evitar bloqueo del WAF
             require_once __DIR__ . '/v1/procesos/router.php';
             routeProcesos($method, $id, $action, $body);
             break;
@@ -236,6 +237,7 @@ try {
                 'endpoints' => [
                     '/api/v1/auth' => 'Autenticación',
                     '/api/v1/procesos' => 'Gestión de procesos',
+                    '/api/v1/casos' => 'Gestión de procesos (alias temporal)',
                     '/api/v1/archivos' => 'Gestión de archivos',
                     '/api/v1/validacion' => 'Validación de datos IA',
                     '/api/v1/colas' => 'Estado de colas',

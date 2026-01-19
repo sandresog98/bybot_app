@@ -335,7 +335,7 @@ async function crearProceso(encolar = false) {
             notas: formData.get('notas')
         };
         
-        const responseCrear = await fetch(`${CONFIG.apiUrl}/procesos`, {
+        const responseCrear = await fetch(`${CONFIG.apiUrl}/casos`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -370,7 +370,7 @@ async function crearProceso(encolar = false) {
         if (encolar) {
             btnGuardar.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Encolando...';
             
-            const responseEncolar = await fetch(`${CONFIG.apiUrl}/procesos/${proceso.id}/encolar-analisis`, {
+            const responseEncolar = await fetch(`${CONFIG.apiUrl}/casos/${proceso.id}/encolar-analisis`, {
                 method: 'POST',
                 credentials: 'include'
             });

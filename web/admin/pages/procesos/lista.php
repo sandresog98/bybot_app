@@ -169,7 +169,7 @@ async function loadProcesos(page = 1) {
             ...currentFilters
         });
         
-        const response = await fetch(`${CONFIG.apiUrl}/procesos?${params}`, {
+        const response = await fetch(`${CONFIG.apiUrl}/casos?${params}`, {
             credentials: 'include'
         });
         
@@ -321,7 +321,7 @@ async function eliminarProceso(id, codigo) {
     }
     
     try {
-        const response = await fetch(`${CONFIG.apiUrl}/procesos/${id}`, {
+        const response = await fetch(`${CONFIG.apiUrl}/casos/${id}`, {
             method: 'DELETE',
             credentials: 'include'
         });

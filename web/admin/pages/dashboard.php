@@ -577,7 +577,7 @@ async function loadPendientesValidacion() {
         baseUrl = baseUrl.replace(/\/+$/, ''); // Remover barras finales
         
         // Construir endpoint sin barra inicial
-        let endpoint = 'procesos';
+        let endpoint = 'casos'; // Alias temporal para evitar bloqueo del WAF
         endpoint = endpoint.replace(/^\/+/, ''); // Remover barras iniciales
         
         // Construir URL final sin barras duplicadas

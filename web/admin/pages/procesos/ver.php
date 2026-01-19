@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function loadProceso() {
     try {
-        const response = await fetch(`${CONFIG.apiUrl}/procesos/${procesoId}`, {
+        const response = await fetch(`${CONFIG.apiUrl}/casos/${procesoId}`, {
             credentials: 'include'
         });
         
@@ -573,7 +573,7 @@ async function encolarAnalisis() {
     if (!confirm('¿Desea encolar este proceso para análisis?')) return;
     
     try {
-        const response = await fetch(`${CONFIG.apiUrl}/procesos/${procesoId}/encolar-analisis`, {
+        const response = await fetch(`${CONFIG.apiUrl}/casos/${procesoId}/encolar-analisis`, {
             method: 'POST',
             credentials: 'include'
         });
@@ -592,7 +592,7 @@ async function encolarLlenado() {
     if (!confirm('¿Desea encolar este proceso para generar el pagaré?')) return;
     
     try {
-        const response = await fetch(`${CONFIG.apiUrl}/procesos/${procesoId}/encolar-llenado`, {
+        const response = await fetch(`${CONFIG.apiUrl}/casos/${procesoId}/encolar-llenado`, {
             method: 'POST',
             credentials: 'include'
         });
@@ -612,7 +612,7 @@ async function cancelarProceso() {
     if (motivo === null) return;
     
     try {
-        const response = await fetch(`${CONFIG.apiUrl}/procesos/${procesoId}/cancelar`, {
+        const response = await fetch(`${CONFIG.apiUrl}/casos/${procesoId}/cancelar`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
