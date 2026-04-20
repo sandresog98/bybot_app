@@ -1,69 +1,16 @@
-# =============================================
-# ByBot v2.0 - .gitignore
-# =============================================
+# RUAF bot artifacts
+bots/ruaf/captcha_intentos/*
+!bots/ruaf/captcha_intentos/.gitkeep
+bots/ruaf/salidas_ruaf/*
+!bots/ruaf/salidas_ruaf/.gitkeep
+bots/ruaf/ruaf_consultas.csv
 
-# Variables de entorno
-.env
-.env.local
-.env.*.local
+# Python artifacts
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
-# Logs
-logs/
-*.log
-
-# Uploads de usuarios
-uploads/procesos/
-
-# Cache
-cache/
-*.cache
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
+# Virtual environments
 venv/
-.venv/
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Node (si se usa)
-node_modules/
-npm-debug.log*
-
-# Archivos temporales
-*.tmp
-*.temp
-temp/
-tmp/
-
-# Backups
-*.bak
-*.backup
-backups/
-
-# Composer
-vendor/
-
-# Archivos de test
-tests/coverage/
-.phpunit.result.cache
-
-# Docker
-docker-compose.override.yml
-
+bots/venv/
