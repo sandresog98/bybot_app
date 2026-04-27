@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import base64
 import csv
+import hashlib
 import io
 import logging
 import re
@@ -66,6 +67,8 @@ DEFAULT_FECHA = "14/04/2016"
 MAX_INTENTOS_CAPTCHA = 40
 POST_VERIFY_WAIT_MS = 15000
 RUAF_DATA_DIR = Path(__file__).resolve().parent
+MAX_FALLOS_CAPTCHA_FUENTE = 3
+MAX_REINICIOS_FORMULARIO = 3
 MSG_NO_INFO_1 = (
     "No existe información con este tipo y número de documento Ministerio de Salud y "
     "Protección Social, Por favor verifique!"
@@ -549,6 +552,91 @@ def obtener_png_captcha(page: Page, cap_img) -> bytes:
         raise RuntimeError(f"Fallback HTTP de captcha falló: {e}") from e
 
 
+def _parece_html(b: bytes) -> bool:
+    sniff = b[:400].lstrip().lower()
+    return (
+        sniff.startswith(b"<!doctype html")
+        or sniff.startswith(b"<html")
+        or b"<body" in sniff
+        or b"<head" in sniff
+    )
+
+
+def validar_png_captcha(b: bytes) -> tuple[bool, str]:
+    """
+    Detecta respuestas inválidas típicas:
+    - HTML/error devuelto con extensión .png
+    - imagen demasiado pequeña o corrupta
+    """
+    if not b:
+        return False, "bytes vacíos"
+    if _parece_html(b):
+        return False, "respuesta HTML en lugar de imagen captcha"
+    if len(b) < 600:
+        return False, f"imagen demasiado pequeña ({len(b)} bytes)"
+    try:
+        im = Image.open(io.BytesIO(b))
+        im.load()
+    except Exception as e:
+        return False, f"imagen no decodificable por PIL: {e}"
+    w, h = im.size
+    if w < 60 or h < 20:
+        return False, f"dimensiones anómalas {w}x{h}"
+    return True, "ok"
+
+
+def forzar_renovacion_captcha(page: Page) -> None:
+    """
+    Intenta forzar un captcha nuevo cuando el sitio repite imagen:
+    1) clic sobre la imagen captcha
+    2) click en posibles enlaces/botones de refresco
+    3) cache-buster sobre src del img captcha
+    """
+    # 1) click en imagen captcha conocida
+    try:
+        img = page.locator(
+            "#MainContent_imgCaptcha, #ctl00_MainContent_imgCaptcha, "
+            "img[id*='Captcha' i], img[src*='captcha' i]"
+        ).first
+        if img.count() > 0 and img.is_visible(timeout=1200):
+            img.click(timeout=1500)
+            time.sleep(0.35)
+            return
+    except Exception:
+        pass
+
+    # 2) enlaces/botones de refresh
+    try:
+        ref = page.locator(
+            "a[href*='captcha' i], a[id*='captcha' i], button[id*='captcha' i], "
+            "input[id*='captcha' i], input[name*='captcha' i]"
+        ).first
+        if ref.count() > 0 and ref.is_visible(timeout=1200):
+            ref.click(timeout=1500)
+            time.sleep(0.35)
+            return
+    except Exception:
+        pass
+
+    # 3) cache buster del src
+    try:
+        page.evaluate(
+            """() => {
+                const img = document.getElementById('MainContent_imgCaptcha')
+                  || document.getElementById('ctl00_MainContent_imgCaptcha')
+                  || document.querySelector('img[id*="Captcha" i], img[src*="captcha" i]');
+                if (!img) return;
+                const now = String(Date.now());
+                const src = img.getAttribute('src') || '';
+                const sep = src.includes('?') ? '&' : '?';
+                img.setAttribute('src', src + sep + 'cb=' + now);
+            }"""
+        )
+    except Exception:
+        pass
+    time.sleep(0.4)
+
+
 def ejecutar_consulta(
     *,
     salida_html: Path,
@@ -583,49 +671,161 @@ def ejecutar_consulta(
         logger.debug("Timeout por defecto de página: 60000 ms")
 
         try:
-            logger.info("Paso 1/… Abriendo términos: %s", DEFAULT_URL_INICIO)
-            page.goto(DEFAULT_URL_INICIO, wait_until="domcontentloaded")
-            logger.info("Página cargada (domcontentloaded). URL actual: %s", page.url)
+            def preparar_formulario() -> None:
+                logger.info("Paso 1/… Abriendo términos: %s", DEFAULT_URL_INICIO)
+                page.goto(DEFAULT_URL_INICIO, wait_until="domcontentloaded")
+                logger.info("Página cargada (domcontentloaded). URL actual: %s", page.url)
 
-            logger.info("Paso 2/… Marcando radio MainContent_RadioButtonList1_0 y enviando formulario")
-            page.locator("#MainContent_RadioButtonList1_0").click()
-            page.locator("#MainContent_btnEnviar, input[name='ctl00$MainContent$btnEnviar']").first.click()
-            logger.info("Esperando pantalla de consulta (selector tipo documento; no networkidle)…")
-            esperar_pagina_consulta_tras_terminos(page)
-            logger.info("Formulario enviado. URL: %s", page.url)
+                logger.info("Paso 2/… Marcando radio MainContent_RadioButtonList1_0 y enviando formulario")
+                page.locator("#MainContent_RadioButtonList1_0").click()
+                page.locator("#MainContent_btnEnviar, input[name='ctl00$MainContent$btnEnviar']").first.click()
+                logger.info("Esperando pantalla de consulta (selector tipo documento; no networkidle)…")
+                esperar_pagina_consulta_tras_terminos(page)
+                logger.info("Formulario enviado. URL: %s", page.url)
 
-            logger.info("Paso 3/… Rellenando formulario de consulta")
-            seleccionar_tipo_documento(page, tipo_doc)
-            page.locator("#MainContent_txbNumeroIdentificacion, input[name='ctl00$MainContent$txbNumeroIdentificacion']").fill(
-                numero_id
-            )
-            logger.info("Número identificación: %s", numero_id)
+                logger.info("Paso 3/… Rellenando formulario de consulta")
+                seleccionar_tipo_documento(page, tipo_doc)
+                page.locator(
+                    "#MainContent_txbNumeroIdentificacion, input[name='ctl00$MainContent$txbNumeroIdentificacion']"
+                ).fill(numero_id)
+                logger.info("Número identificación: %s", numero_id)
 
-            datepicker = page.locator("#MainContent_datepicker, input[name='ctl00$MainContent$datepicker']")
-            datepicker.click()
-            datepicker.fill("")
-            datepicker.fill(fecha)
-            logger.info("Fecha (DD/MM/YYYY): %s", fecha)
-            # Quitar foco del datepicker y cerrar overlay (si no, bloquea el botón Verificar)
-            try:
-                page.keyboard.press("Tab")
-            except Exception as e:
-                logger.debug("Tab tras fecha: %s", e)
-            cerrar_datepicker_jquery_ui(page)
-            logger.info("Datepicker cerrado (listo para captcha / Verificar).")
+                datepicker = page.locator("#MainContent_datepicker, input[name='ctl00$MainContent$datepicker']")
+                datepicker.click()
+                datepicker.fill("")
+                datepicker.fill(fecha)
+                logger.info("Fecha (DD/MM/YYYY): %s", fecha)
+                try:
+                    page.keyboard.press("Tab")
+                except Exception as e:
+                    logger.debug("Tab tras fecha: %s", e)
+                cerrar_datepicker_jquery_ui(page)
+                logger.info("Datepicker cerrado (listo para captcha / Verificar).")
 
+            preparar_formulario()
             mensaje = page.locator("#MainContent_lblMessage, span[id='MainContent_lblMessage']")
+            ultima_firma_captcha = ""
+            repeticiones_captcha = 0
+            fallos_captcha_fuente = 0
+            reinicios_formulario = 0
 
             logger.info("Paso 4/… Bucle captcha (máx. %s intentos)", MAX_INTENTOS_CAPTCHA)
             for intento in range(1, MAX_INTENTOS_CAPTCHA + 1):
                 logger.info("--- Intento captcha %s/%s ---", intento, MAX_INTENTOS_CAPTCHA)
-                cap_img = localizar_imagen_captcha(page)
+                try:
+                    cap_img = localizar_imagen_captcha(page)
+                except Exception as e:
+                    fallos_captcha_fuente += 1
+                    logger.warning(
+                        "Captcha no localizado (fallo %s/%s): %s",
+                        fallos_captcha_fuente,
+                        MAX_FALLOS_CAPTCHA_FUENTE,
+                        e,
+                    )
+                    if fallos_captcha_fuente >= MAX_FALLOS_CAPTCHA_FUENTE:
+                        if reinicios_formulario < MAX_REINICIOS_FORMULARIO:
+                            reinicios_formulario += 1
+                            logger.warning(
+                                "Se alcanzaron %s fallos de captcha. Reiniciando flujo de formulario (%s/%s)…",
+                                MAX_FALLOS_CAPTCHA_FUENTE,
+                                reinicios_formulario,
+                                MAX_REINICIOS_FORMULARIO,
+                            )
+                            preparar_formulario()
+                            fallos_captcha_fuente = 0
+                            ultima_firma_captcha = ""
+                            repeticiones_captcha = 0
+                            time.sleep(0.8)
+                            continue
+                        return {
+                            "estado": "ERROR_PAGINA_CAPTCHA",
+                            "motivo": (
+                                "La página no está entregando captcha válido "
+                                "(imagen ausente/no cargada) tras varios reinicios."
+                            ),
+                            "archivo_html": "",
+                        }
+                    forzar_renovacion_captcha(page)
+                    time.sleep(0.6)
+                    continue
                 try:
                     png = obtener_png_captcha(page, cap_img)
                 except Exception as e:
                     logger.warning("No se pudo obtener imagen captcha en intento %s: %s", intento, e)
+                    fallos_captcha_fuente += 1
+                    if fallos_captcha_fuente >= MAX_FALLOS_CAPTCHA_FUENTE:
+                        if reinicios_formulario < MAX_REINICIOS_FORMULARIO:
+                            reinicios_formulario += 1
+                            logger.warning(
+                                "Captcha inválido repetido. Reiniciando flujo de formulario (%s/%s)…",
+                                reinicios_formulario,
+                                MAX_REINICIOS_FORMULARIO,
+                            )
+                            preparar_formulario()
+                            fallos_captcha_fuente = 0
+                            ultima_firma_captcha = ""
+                            repeticiones_captcha = 0
+                            time.sleep(0.8)
+                            continue
+                        return {
+                            "estado": "ERROR_PAGINA_CAPTCHA",
+                            "motivo": (
+                                "La página no está entregando captcha válido "
+                                "(fallo al capturar imagen) tras varios reinicios."
+                            ),
+                            "archivo_html": "",
+                        }
+                    forzar_renovacion_captcha(page)
                     time.sleep(0.6)
                     continue
+                ok_png, motivo_png = validar_png_captcha(png)
+                if not ok_png:
+                    logger.warning(
+                        "Captcha inválido/no cargado (%s). Forzando renovación e intentando de nuevo…",
+                        motivo_png,
+                    )
+                    fallos_captcha_fuente += 1
+                    if fallos_captcha_fuente >= MAX_FALLOS_CAPTCHA_FUENTE:
+                        if reinicios_formulario < MAX_REINICIOS_FORMULARIO:
+                            reinicios_formulario += 1
+                            logger.warning(
+                                "Captcha inválido/no cargado %s veces. Reiniciando formulario (%s/%s)…",
+                                MAX_FALLOS_CAPTCHA_FUENTE,
+                                reinicios_formulario,
+                                MAX_REINICIOS_FORMULARIO,
+                            )
+                            preparar_formulario()
+                            fallos_captcha_fuente = 0
+                            ultima_firma_captcha = ""
+                            repeticiones_captcha = 0
+                            time.sleep(0.8)
+                            continue
+                        return {
+                            "estado": "ERROR_PAGINA_CAPTCHA",
+                            "motivo": (
+                                "La página devuelve contenido inválido en el captcha "
+                                "(HTML/imagen rota) tras varios reinicios."
+                            ),
+                            "archivo_html": "",
+                        }
+                    forzar_renovacion_captcha(page)
+                    time.sleep(0.6)
+                    continue
+                fallos_captcha_fuente = 0
+
+                firma = hashlib.sha1(png).hexdigest()
+                if firma == ultima_firma_captcha:
+                    repeticiones_captcha += 1
+                else:
+                    repeticiones_captcha = 0
+                    ultima_firma_captcha = firma
+                if repeticiones_captcha >= 1:
+                    logger.warning(
+                        "Captcha repetido detectado (hash igual). Forzando renovación e intentando de nuevo…"
+                    )
+                    forzar_renovacion_captcha(page)
+                    continue
+
                 pil = Image.open(io.BytesIO(png))
                 texto, estrategia = leer_captcha_multipass(pil)
                 if captchas_dir is not None:
@@ -633,8 +833,9 @@ def ejecutar_consulta(
                 logger.info("Texto OCR (5 caracteres esperados): %r (longitud=%s)", texto, len(texto))
                 if len(texto) != 5:
                     logger.warning(
-                        "OCR no devolvió 5 caracteres; esperando y tomando de nuevo la imagen (sin recargar)…"
+                        "OCR no devolvió 5 caracteres; forzando renovación de captcha y reintentando…"
                     )
+                    forzar_renovacion_captcha(page)
                     time.sleep(0.6)
                     cerrar_datepicker_jquery_ui(page)
                     continue
@@ -669,8 +870,9 @@ def ejecutar_consulta(
                         raise RuntimeError("Captcha inválido tras el máximo de intentos.")
                     logger.warning(
                         "Captcha rechazado; el sitio regenera la imagen y limpia el campo. "
-                        "Esperando y reintentando OCR (sin recargar ni clic en refresh)…"
+                        "Forzando renovación por seguridad y reintentando OCR…"
                     )
+                    forzar_renovacion_captcha(page)
                     time.sleep(0.85)
                     cerrar_datepicker_jquery_ui(page)
                     continue
