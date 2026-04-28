@@ -19,3 +19,4 @@ bots/simpleco/simpleco_consultas.csv
 # Virtual environments
 venv/
 bots/venv/
+.cursor/
