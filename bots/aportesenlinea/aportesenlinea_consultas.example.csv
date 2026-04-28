@@ -1,0 +1,3 @@
+timestamp,numero_id,estado,motivo,archivo_pdf
+2026-04-28 14:00:00,1012420137,EXITOSA,OK,C:\xampp\htdocs\projects\bybot_app\bots\aportesenlinea\salidas_aportesenlinea\aportesenlinea_1012420137_20260428_140000.pdf
+2026-04-28 14:05:00,1012420137,ERROR_CAPTCHA,No fue posible validar el reCAPTCHA.,

@@ -43,6 +43,7 @@ sudo apt install tesseract-ocr tesseract-ocr-spa
 - `asopagos/`: consulta en ASOPAGOS con validación de captcha y descarga de certificado en PDF.
 - `aportesenlinea/`: paso inicial del portal empresas; abre opción **Certificados de aportes** y valida navegación a `CertificadoAportes.aspx`.
 - `fosiga/`: primer paso en ADRES `Consulte su EPS`; abre la página y diligencia el campo **Número**.
+- `rues/`: consulta de Registro Mercantil en RUES; busca por número, detecta `Número de Matrícula` o `No se encontraron resultados`, guarda HTML en éxito y registra auditoría CSV.
 
 Ejemplo rápido:
 

@@ -1,0 +1,27 @@
+fecha_hora,numero_busqueda,estado,motivo,url_final
+2026-04-28 15:32:57,52727688,ERROR,"Locator.wait_for: Timeout 15000ms exceeded.
+Call log:
+  - waiting for locator(""button.btn-busqueda.busqueda__button--xs[type='submit']"").first to be visible
+    34 × locator resolved to hidden <button type=""submit"" id=""btn-busqueda"" class=""d-block d-sm-none btn btn-primary input-group-append btn-busqueda busqueda__button--xs"">…</button>
+",https://www.rues.org.co/
+2026-04-28 15:33:25,52727688,ERROR,"Locator.wait_for: Timeout 15000ms exceeded.
+Call log:
+  - waiting for locator(""button.btn-busqueda.busqueda__button--xs[type='submit']"").first to be visible
+    34 × locator resolved to hidden <button type=""submit"" id=""btn-busqueda"" class=""d-block d-sm-none btn btn-primary input-group-append btn-busqueda busqueda__button--xs"">…</button>
+",https://www.rues.org.co/
+2026-04-28 15:35:30,52727688,EXITOSA,"Flujo inicial RUES completado: cerrar aviso, diligenciar búsqueda y buscar.",https://www.rues.org.co/buscar/RM/52727688
+2026-04-28 15:35:53,52727688,EXITOSA,"Flujo inicial RUES completado: cerrar aviso, diligenciar búsqueda y buscar.",https://www.rues.org.co/buscar/RM/52727688
+2026-04-28 15:37:29,52727688,EXITOSA,"Flujo inicial RUES completado: cerrar aviso, diligenciar búsqueda y buscar.",https://www.rues.org.co/buscar/RM/52727688
+2026-04-28 15:49:30,52727688,FINALIZADO,No se encontraron resultados.,https://www.rues.org.co/buscar/RM/52727688
+2026-04-28 15:49:43,52727688,FINALIZADO,No se encontraron resultados.,https://www.rues.org.co/buscar/RM/52727688
+2026-04-28 15:50:06,52727688,FINALIZADO,No se encontraron resultados.,https://www.rues.org.co/buscar/RM/52727688
+2026-04-28 15:50:23,52727688,ERROR,Page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at https://www.rues.org.co/,about:blank
+2026-04-28 15:50:29,52727688,ERROR,Page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at https://www.rues.org.co/,about:blank
+2026-04-28 15:53:07,52727688,FINALIZADO,No se encontraron resultados.,https://www.rues.org.co/buscar/RM/52727688
+2026-04-28 15:53:22,52727688,FINALIZADO,No se encontraron resultados.,https://www.rues.org.co/buscar/RM/52727688
+2026-04-28 15:54:48,52727688,FINALIZADO,No se encontraron resultados.,https://www.rues.org.co/buscar/RM/52727688
+2026-04-28 16:04:36,52727688,EXITOSA,Consulta encontrada en RUES.,https://www.rues.org.co/buscar/RM/52727688
+2026-04-28 16:04:58,52727688,EXITOSA,Consulta encontrada en RUES.,https://www.rues.org.co/buscar/RM/52727688
+2026-04-28 16:17:54,1022434547,ERROR,No se pudo hacer clic en el boton Buscar de Registro Mercantil.,https://www.rues.org.co/
+2026-04-28 16:18:36,52727688,EXITOSA,Consulta encontrada en RUES.,https://www.rues.org.co/buscar/RM/52727688
+2026-04-28 16:18:51,1022434547,FINALIZADO,No se encontraron resultados.,https://www.rues.org.co/buscar/RM/1022434547

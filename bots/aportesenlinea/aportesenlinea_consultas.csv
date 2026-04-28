@@ -1,0 +1,10 @@
+timestamp,numero_id,estado,motivo,archivo_pdf
+2026-04-28 14:56:57,1012420137,ERROR_CAPTCHA,No fue posible validar el reCAPTCHA.,
+2026-04-28 15:01:54,1012420137,ERROR,No se pudo seleccionar EPS: NUEVA E.P.S.,
+2026-04-28 15:02:19,1012420137,ERROR,No se pudo seleccionar EPS: NUEVA E.P.S.,
+2026-04-28 15:02:48,1012420137,ERROR,No se pudo seleccionar EPS: NUEVA E.P.S.,
+2026-04-28 15:03:23,1012420137,ERROR_CAPTCHA,No fue posible validar el reCAPTCHA.,
+2026-04-28 15:06:27,1012420137,ERROR_CAPTCHA,No fue posible validar el reCAPTCHA.,
+2026-04-28 15:08:35,1012420137,ERROR_CAPTCHA,No fue posible validar el reCAPTCHA.,
+2026-04-28 15:10:21,1012420137,ERROR,Nueva pestaña abierta ('https://empresas.aportesenlinea.com/home/RS_CertificadoAportes.aspx') pero no se pudo descargar el PDF. Verifica manualmente que el certificado esté disponible.,
+2026-04-28 15:13:46,1012420137,EXITOSA,OK,C:\xampp\htdocs\projects\bybot_app\bots\aportesenlinea\salidas_aportesenlinea\aportesenlinea_1012420137_20260428_151337.pdf
