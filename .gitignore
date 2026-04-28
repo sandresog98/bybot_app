@@ -5,6 +5,11 @@ bots/ruaf/salidas_ruaf/*
 !bots/ruaf/salidas_ruaf/.gitkeep
 bots/ruaf/ruaf_consultas.csv
 
+# Simple.co bot artifacts
+bots/simpleco/salidas_simpleco/*
+!bots/simpleco/salidas_simpleco/.gitkeep
+bots/simpleco/simpleco_consultas.csv
+
 # Python artifacts
 **/__pycache__/
 *.pyc
