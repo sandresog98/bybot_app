@@ -426,10 +426,10 @@ def _es_imagen_captcha_valida(img_locator) -> bool:
             return False
         w = float(box["width"])
         h = float(box["height"])
-        # Rango típico captcha RUAF: ancho medio, altura baja.
-        if w < 80 or w > 360:
+        # Rango típico captcha RUAF: evita íconos pequeños (OCR suele dar "24", etc.).
+        if w < 70 or w > 400:
             return False
-        if h < 20 or h > 120:
+        if h < 22 or h > 140:
             return False
         return True
     except Exception:
@@ -447,7 +447,6 @@ def localizar_imagen_captcha(page: Page):
         'img[src*="Captcha" i]',
         'img[src*="captcha" i]',
     ]
-    fallback_visible = None
     for sel in candidatos:
         loc = page.locator(sel)
         try:
@@ -459,8 +458,6 @@ def localizar_imagen_captcha(page: Page):
             if _es_imagen_captcha_valida(first):
                 logger.info("Captcha localizado con selector: %s", sel)
                 return first
-            if fallback_visible is None:
-                fallback_visible = first
         except Exception as e:
             logger.debug("Selector captcha %r: %s", sel, e)
             continue
@@ -494,7 +491,12 @@ def localizar_imagen_captcha(page: Page):
                     b = im.bounding_box()
                     if not b:
                         continue
-                    if abs(b["y"] - box["y"]) < 110 and b["x"] < box["x"] and b["width"] > 40:
+                    if (
+                        abs(b["y"] - box["y"]) < 110
+                        and b["x"] < box["x"]
+                        and b["width"] >= 70
+                        and b["height"] >= 22
+                    ):
                         logger.warning(
                             "Captcha localizado por fallback flexible de proximidad; "
                             "conviene revisar tamaños esperados."
@@ -504,52 +506,65 @@ def localizar_imagen_captcha(page: Page):
                     continue
     except Exception as e:
         logger.debug("Búsqueda captcha por proximidad: %s", e)
-    if fallback_visible is not None:
-        logger.warning(
-            "Captcha localizado por fallback de selector visible (sin validar tamaño)."
-        )
-        return fallback_visible
     raise RuntimeError("No se encontró la imagen del captcha. Revise selectores en el sitio.")
 
 
 def obtener_png_captcha(page: Page, cap_img) -> bytes:
     """
-    Obtiene bytes PNG del captcha con fallback:
-    1) screenshot del locator (rápido)
-    2) leer src del <img> (data:image o descarga HTTP con cookies del contexto)
+    Obtiene bytes PNG del captcha.
+    Preferir bytes desde atributo src (respuesta directa del servidor): suele evitar pérdidas
+    de nitidez del screenshot sobre el elemento; si falla la validación, se usa screenshot.
     """
-    try:
-        return cap_img.screenshot(timeout=7000)
-    except PlaywrightTimeoutError as e:
-        logger.warning(
-            "Timeout capturando screenshot del captcha (%s). Intentando fallback por atributo src…",
-            e,
-        )
-
     src = None
     try:
         src = cap_img.get_attribute("src")
     except Exception as e:
-        logger.debug("No se pudo leer src de captcha: %s", e)
-    if not src:
-        raise RuntimeError("No se pudo capturar captcha: src vacío y screenshot falló.")
+        logger.debug("No se pudo leer src del captcha: %s", e)
 
-    src = src.strip()
-    if src.startswith("data:image"):
-        try:
-            _, b64 = src.split(",", 1)
-            return base64.b64decode(b64)
-        except Exception as e:
-            raise RuntimeError(f"No se pudo decodificar data:image del captcha: {e}") from e
+    bodies_desde_src: list[bytes] = []
+    if src:
+        s = src.strip()
+        if s.startswith("data:image"):
+            try:
+                _, b64 = s.split(",", 1)
+                bodies_desde_src.append(base64.b64decode(b64))
+            except Exception as e:
+                logger.debug("No se decodificó data:image captcha: %s", e)
+        elif s and not s.lower().startswith("javascript:"):
+            try:
+                url_img = urljoin(page.url, s)
+                resp = page.context.request.get(url_img, timeout=15000)
+                if resp.ok:
+                    bodies_desde_src.append(resp.body())
+                else:
+                    logger.debug("HTTP %s descargando captcha: %s", resp.status, url_img)
+            except Exception as e:
+                logger.debug("Descarga HTTP captcha por src falló: %s", e)
+
+    for body in bodies_desde_src:
+        ok, motivo = validar_png_captcha(body)
+        if ok:
+            return body
+        logger.debug("Captcha desde src rechazado: %s", motivo)
 
     try:
-        url_img = urljoin(page.url, src)
-        resp = page.context.request.get(url_img, timeout=15000)
-        if not resp.ok:
-            raise RuntimeError(f"HTTP {resp.status} al descargar captcha: {url_img}")
-        return resp.body()
-    except Exception as e:
-        raise RuntimeError(f"Fallback HTTP de captcha falló: {e}") from e
+        shot = cap_img.screenshot(timeout=7000)
+        ok, motivo = validar_png_captcha(shot)
+        if ok:
+            return shot
+        logger.warning("Screenshot captcha no pasó validación: %s", motivo)
+    except PlaywrightTimeoutError as e:
+        logger.warning(
+            "Timeout capturando screenshot del captcha (%s). ¿src HTTP disponible?…",
+            e,
+        )
+
+    for body in bodies_desde_src:
+        ok, _mot = validar_png_captcha(body)
+        if ok:
+            return body
+
+    raise RuntimeError("No se pudo capturar captcha válido (screenshot/src).")
 
 
 def _parece_html(b: bytes) -> bool:
@@ -592,39 +607,41 @@ def forzar_renovacion_captcha(page: Page) -> None:
     2) click en posibles enlaces/botones de refresco
     3) cache-buster sobre src del img captcha
     """
-    # 1) click en imagen captcha conocida
+    # 1) clic en imagen captcha conocida
     try:
-        img = page.locator(
+        loc_img = page.locator(
             "#MainContent_imgCaptcha, #ctl00_MainContent_imgCaptcha, "
-            "img[id*='Captcha' i], img[src*='captcha' i]"
-        ).first
-        if img.count() > 0 and img.is_visible(timeout=1200):
-            img.click(timeout=1500)
+            "img[id*='Captcha' i], img[src*='captcha' i], img[alt*='captcha' i]"
+        )
+        if loc_img.count() > 0 and loc_img.first.is_visible(timeout=1200):
+            loc_img.first.click(timeout=1500)
             time.sleep(0.35)
             return
     except Exception:
         pass
 
-    # 2) enlaces/botones de refresh
+    # 2) enlaces/botones de refresco
     try:
-        ref = page.locator(
+        loc_ref = page.locator(
             "a[href*='captcha' i], a[id*='captcha' i], button[id*='captcha' i], "
             "input[id*='captcha' i], input[name*='captcha' i]"
-        ).first
-        if ref.count() > 0 and ref.is_visible(timeout=1200):
-            ref.click(timeout=1500)
+        )
+        if loc_ref.count() > 0 and loc_ref.first.is_visible(timeout=1200):
+            loc_ref.first.click(timeout=1500)
             time.sleep(0.35)
             return
     except Exception:
         pass
 
-    # 3) cache buster del src
+    # 3) cache-buster del src en el DOM (misma política que el locator de arriba)
     try:
         page.evaluate(
             """() => {
                 const img = document.getElementById('MainContent_imgCaptcha')
                   || document.getElementById('ctl00_MainContent_imgCaptcha')
-                  || document.querySelector('img[id*="Captcha" i], img[src*="captcha" i]');
+                  || document.querySelector(
+                    'img[id*="Captcha" i], img[src*="captcha" i], img[alt*="captcha" i]'
+                  );
                 if (!img) return;
                 const now = String(Date.now());
                 const src = img.getAttribute('src') || '';

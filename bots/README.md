@@ -44,6 +44,7 @@ sudo apt install tesseract-ocr tesseract-ocr-spa
 - `aportesenlinea/`: paso inicial del portal empresas; abre opción **Certificados de aportes** y valida navegación a `CertificadoAportes.aspx`.
 - `fosiga/`: primer paso en ADRES `Consulte su EPS`; abre la página y diligencia el campo **Número**.
 - `rues/`: consulta de Registro Mercantil en RUES; busca por número, detecta `Número de Matrícula` o `No se encontraron resultados`, guarda HTML en éxito y registra auditoría CSV.
+- `suaporte/`: **SuAporte — Consulta directa de comprobantes**; pagina principal, `numeroDocumentoUsuario`, cedula y **Consultar** (aviso 6 meses, vuelta a principal, **Borrar**).
 
 Ejemplo rápido:
 
