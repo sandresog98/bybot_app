@@ -1,0 +1,3 @@
+fecha_hora,numero_id,estado,motivo,archivo_original
+2026-06-30 17:34:45,1022434547,ERROR_PAGINA_CAPTCHA,La imagen del captcha esta rota o no carga tras varios reinicios del formulario.,
+2026-06-30 18:06:21,1022434547,NO_EXITOSA_NEGOCIO,"La fecha de expedicion o nacimiento no coincide con la la informacion reportada en las tablas de referencia del Ministerio de Salud y Proteccion Social, Por favor verifique!",

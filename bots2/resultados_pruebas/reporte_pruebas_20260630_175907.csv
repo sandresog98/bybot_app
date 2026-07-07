@@ -1,0 +1,5 @@
+fecha_hora,numero_id,estado,motivo,archivo_original
+2026-06-30 17:59:12,52727688,EXITOSA,Consulta encontrada en RUES.,/opt/lampp/htdocs/projects/bybot_v1/bots2/rues/salidas_rues/rues_52727688_20260630_175912.html
+2026-06-30 17:59:24,52727688,EXITOSA,"Paso completado: numero diligenciado, clic en Consultar y HTML exportado.",/opt/lampp/htdocs/projects/bybot_v1/bots2/fosiga/salidas_fosiga/fosiga_52727688_20260630_175924.html
+2026-06-30 17:59:32,1022434547,FINALIZADO,No se encontraron resultados.,
+2026-06-30 17:59:45,1022434547,EXITOSA,"Paso completado: numero diligenciado, clic en Consultar y HTML exportado.",/opt/lampp/htdocs/projects/bybot_v1/bots2/fosiga/salidas_fosiga/fosiga_1022434547_20260630_175945.html

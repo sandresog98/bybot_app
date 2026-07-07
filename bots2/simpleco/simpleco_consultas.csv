@@ -1,0 +1,4 @@
+fecha_hora,numero_id,estado,motivo,archivo_original,periodo_mes,periodo_anio
+2026-06-30 17:21:08,79952921,ERROR,"Locator.count: Target page, context or browser has been closed",,5,2026
+2026-06-30 17:33:04,79952921,ERROR,No se encontro o no se pudo pulsar el radio de periodo. url='https://www.simple.co/Web/faces/pages/comprobantes/consultadirecta/consultaDirectaPreguntas.xhtml' | title='Simple.co | Portal Transaccional de Pagosimple'...,,5,2026
+2026-06-30 17:33:54,79952921,ERROR_SEGURIDAD,El portal rechazo la consulta: 'No fue posible validar la seguridad. Por favor intente nuevamente.',,5,2026

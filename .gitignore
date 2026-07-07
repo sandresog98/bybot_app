@@ -19,4 +19,9 @@ bots/simpleco/simpleco_consultas.csv
 # Virtual environments
 venv/
 bots/venv/
+bots2/venv/
+
+# Environment variables (API keys)
+.env
+bots2/.env
 .cursor/

@@ -1,0 +1,7 @@
+fecha_hora,numero_id,estado,motivo,archivo_original,url_final
+2026-06-30 17:18:19,52727688,ERROR,Locator.wait_for: Timeout 15000ms exceeded.,,https://www.rues.org.co/
+2026-06-30 17:19:20,52727688,EXITOSA,Consulta encontrada en RUES.,/opt/lampp/htdocs/projects/bybot_v1/bots2/rues/salidas_rues/rues_52727688_20260630_171920.html,https://www.rues.org.co/buscar/RM/52727688
+2026-06-30 17:30:28,52727688,EXITOSA,Consulta encontrada en RUES.,/opt/lampp/htdocs/projects/bybot_v1/bots2/rues/salidas_rues/rues_52727688_20260630_173028.html,https://www.rues.org.co/buscar/RM/52727688
+2026-06-30 17:57:53,52727688,ERROR,Locator.wait_for: Timeout 15000ms exceeded.,,https://www.rues.org.co/
+2026-06-30 17:59:12,52727688,EXITOSA,Consulta encontrada en RUES.,/opt/lampp/htdocs/projects/bybot_v1/bots2/rues/salidas_rues/rues_52727688_20260630_175912.html,https://www.rues.org.co/buscar/RM/52727688
+2026-06-30 17:59:32,1022434547,FINALIZADO,No se encontraron resultados.,,https://www.rues.org.co/buscar/RM/1022434547

@@ -1,0 +1,3 @@
+fecha_hora,numero_id,estado,motivo,archivo_original
+2026-06-30 17:57:53,52727688,ERROR,Locator.wait_for: Timeout 15000ms exceeded.,
+2026-06-30 17:58:40,52727688,ERROR,El portal bloqueo la consulta en modo headless por validacion/captcha (no se abrio la pagina de respuesta).,
