@@ -1,0 +1,42 @@
+/* =============================================================================
+   admin.css — Estilos específicos del panel de admin (complementa common.css)
+   ============================================================================= */
+
+.by-stat-card {
+    border: 1px solid var(--by-borde);
+    border-radius: var(--by-radius);
+    background: #fff;
+    padding: 1.1rem 1.25rem;
+    box-shadow: var(--by-sombra);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+}
+.by-stat-card .stat-label {
+    color: var(--by-gris);
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-weight: 600;
+}
+.by-stat-card .stat-value {
+    font-family: var(--by-fuente-titulo);
+    font-weight: 800;
+    font-size: 1.75rem;
+    color: var(--by-azul);
+    line-height: 1.1;
+}
+.by-stat-card .stat-hint { font-size: .8rem; color: var(--by-gris); }
+
+.by-pager { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+
+/* Sidebar colapsable (botón) */
+.sidebar-toggle { cursor: pointer; color: var(--by-azul-2); background: transparent; border: none; padding: .35rem .55rem; border-radius: .375rem; }
+.sidebar-toggle:hover { background: var(--by-azul-suave); }
+
+.app-shell.sidebar-collapsed .app-sidebar { width: var(--by-sidebar-w-colapsado); }
+.app-shell.sidebar-collapsed .app-sidebar .nav-link span,
+.app-shell.sidebar-collapsed .app-sidebar .logo span,
+.app-shell.sidebar-collapsed .app-sidebar .section-label { display: none; }
+.app-shell.sidebar-collapsed .app-sidebar .logo { text-align: center; padding: 1rem .25rem; }

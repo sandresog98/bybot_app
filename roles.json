@@ -1,0 +1,17 @@
+{
+  "_doc": "Definición de roles del sistema ByBot. Cada rol lista los módulos del admin a los que tiene acceso. Un módulo se referencia por el identificador usado en el router (?page=<modulo>). El código PHP debe leer este archivo para validar acceso; las páginas PHP del admin lo respetan.",
+  "roles": {
+    "admin": {
+      "label": "Administrador",
+      "modulos": ["dashboard", "procesos", "analisis", "prompts", "usuarios", "configuracion"]
+    },
+    "supervisor": {
+      "label": "Supervisor",
+      "modulos": ["dashboard", "procesos", "analisis"]
+    },
+    "operador": {
+      "label": "Operador",
+      "modulos": ["dashboard", "procesos", "analisis"]
+    }
+  }
+}

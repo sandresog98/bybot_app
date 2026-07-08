@@ -24,4 +24,11 @@ bots2/venv/
 # Environment variables (API keys)
 .env
 bots2/.env
+app_worker/.env
 .cursor/
+
+# App uploads & logs (carpetas con .gitkeep)
+uploads/*
+!uploads/.gitkeep
+logs/*
+!logs/.gitkeep
