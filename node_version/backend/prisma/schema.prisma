@@ -1,0 +1,267 @@
+// Prisma schema — Mirror de las tablas ya creadas por sql/ddl.sql.
+// Las tablas son gestionadas por ddl.sql (control SQL explícito; no migrations de Prisma).
+// Prisma se usa solo como cliente tipado.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============= control =============
+
+model ControlUsuario {
+  id                Int       @id @default(autoincrement())
+  usuario           String    @unique @db.VarChar(50)
+  password          String    @db.VarChar(255)
+  nombre_completo   String    @db.VarChar(100)
+  email             String?   @db.VarChar(100)
+  rol               String    @default("operador") @db.VarChar(30)
+  clave_un_solo_uso Int       @default(1) @db.TinyInt
+  estado_activo     Int       @default(1) @db.TinyInt
+  ultimo_acceso     DateTime? @db.DateTime
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @default(now()) @updatedAt
+
+  sesiones               ControlSesion[]
+  api_tokens             ControlApiToken[]
+  logs                   ControlLog[]
+  prompts_cre            AppPrompt[]            @relation("AppPromptCreador")
+  procesos_creados       Proceso[]              @relation("ProcesosCreados")
+  procesos_asignados     Proceso[]              @relation("ProcesosAsignados")
+  archivos_subidos       ProcesoArchivo[]       @relation("ArchivosSubidos")
+  datos_ia_validados     ProcesosDatosIa[]      @relation("DatosIaValidador")
+  historial_registros    ProcesosHistorial[]    @relation("HistorialUsuario")
+
+  @@index([rol], name: "idx_ctrl_usu_rol")
+  @@index([estado_activo], name: "idx_ctrl_usu_estado")
+  @@map("control_usuarios")
+}
+
+model ControlSesion {
+  id         Int      @id @default(autoincrement())
+  usuario_id Int
+  token      String   @unique @db.VarChar(128)
+  ip         String?  @db.VarChar(45)
+  user_agent String?  @db.VarChar(255)
+  expires_at DateTime @db.DateTime
+  created_at DateTime @default(now())
+
+  usuario ControlUsuario @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  @@index([token], name: "idx_ses_token")
+  @@index([usuario_id], name: "idx_ses_usuario")
+  @@index([expires_at], name: "idx_ses_expires")
+  @@map("control_sesiones")
+}
+
+model ControlApiToken {
+  id           Int       @id @default(autoincrement())
+  usuario_id   Int
+  nombre       String    @db.VarChar(100)
+  token        String    @unique @db.VarChar(128)
+  scopes       String?   @db.VarChar(255)
+  expires_at   DateTime? @db.DateTime
+  last_used_at DateTime? @db.DateTime
+  created_at   DateTime  @default(now())
+
+  usuario ControlUsuario @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  @@index([token], name: "idx_apitok_token")
+  @@map("control_api_tokens")
+}
+
+model ControlLog {
+  id               Int       @id @default(autoincrement())
+  usuario_id       Int?
+  timestamp        DateTime  @default(now())
+  accion           String    @db.VarChar(50)
+  modulo           String    @db.VarChar(50)
+  entidad_tipo     String?   @db.VarChar(50)
+  entidad_id       Int?
+  detalle          String?
+  ip               String?   @db.VarChar(45)
+  user_agent       String?   @db.VarChar(255)
+  datos_anteriores  Json?
+  datos_nuevos     Json?
+  nivel            String    @default("info") @db.VarChar(20)
+
+  usuario ControlUsuario? @relation(fields: [usuario_id], references: [id], onDelete: SetNull)
+
+  @@index([accion], name: "idx_log_accion")
+  @@index([modulo], name: "idx_log_modulo")
+  @@index([usuario_id], name: "idx_log_usuario")
+  @@index([timestamp], name: "idx_log_timestamp")
+  @@index([entidad_tipo, entidad_id], name: "idx_log_entidad")
+  @@map("control_logs")
+}
+
+// ============= app transversal =============
+
+model AppConfiguracion {
+  id          Int      @id @default(autoincrement())
+  clave       String   @unique @db.VarChar(100)
+  valor       String
+  tipo        String   @default("string") @db.VarChar(20)
+  categoria   String   @default("general") @db.VarChar(50)
+  descripcion String?
+  updated_at  DateTime @default(now()) @updatedAt
+
+  @@index([clave], name: "idx_appcfg_clave")
+  @@index([categoria], name: "idx_appcfg_categoria")
+  @@map("app_configuracion")
+}
+
+model AppPrompt {
+  id         Int      @id @default(autoincrement())
+  nombre     String   @db.VarChar(100)
+  version    String   @db.VarChar(20)
+  tipo       String   @db.VarChar(50)
+  contenido  String   @db.MediumText
+  activo     Int      @default(0) @db.TinyInt
+  notas      String?
+  creado_por Int?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now()) @updatedAt
+
+  creado_por_user ControlUsuario? @relation("AppPromptCreador", fields: [creado_por], references: [id], onDelete: SetNull)
+
+  @@unique([nombre, version], name: "uk_prompt_nombre_version")
+  @@index([tipo], name: "idx_prompt_tipo")
+  @@index([activo], name: "idx_prompt_activo")
+  @@map("app_prompts")
+}
+
+model AppColasTrabajo {
+  id            Int       @id @default(autoincrement())
+  job_id        String    @unique @db.VarChar(100)
+  cola          String    @db.VarChar(50)
+  proceso_id    Int?
+  tipo_trabajo  String    @db.VarChar(50)
+  estado        String    @default("pendiente") @db.VarChar(30)
+  payload       Json
+  resultado     Json?
+  error_mensaje String?
+  intentos      Int       @default(0)
+  max_intentos  Int       @default(3)
+  prioridad     Int       @default(5)
+  worker_id     String?   @db.VarChar(100)
+  created_at    DateTime  @default(now())
+  started_at    DateTime? @db.DateTime
+  finished_at   DateTime? @db.DateTime
+  duracion_ms   Int?
+
+  proceso Proceso? @relation(fields: [proceso_id], references: [id], onDelete: Cascade)
+
+  @@index([job_id], name: "idx_cola_job")
+  @@index([cola], name: "idx_cola_cola")
+  @@index([proceso_id], name: "idx_cola_proceso")
+  @@index([estado], name: "idx_cola_estado")
+  @@index([estado, prioridad, created_at], name: "idx_cola_pendientes")
+  @@map("app_colas_trabajos")
+}
+
+// ============= procesos =============
+
+model Proceso {
+  id                Int       @id @default(autoincrement())
+  codigo            String    @unique @db.VarChar(50)
+  tipo              String    @default("cobranza") @db.VarChar(30)
+  estado            String    @default("creado") @db.VarChar(30)
+  prioridad         Int       @default(5)
+  creado_por        Int?
+  asignado_a        Int?
+  intentos_analisis Int       @default(0)
+  max_intentos      Int       @default(3)
+  notas             String?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @default(now()) @updatedAt
+  fecha_analisis    DateTime? @db.DateTime
+  fecha_validacion  DateTime? @db.DateTime
+  fecha_completado  DateTime? @db.DateTime
+
+  creado_por_user ControlUsuario? @relation("ProcesosCreados", fields: [creado_por], references: [id], onDelete: SetNull)
+  asignado_a_user ControlUsuario? @relation("ProcesosAsignados", fields: [asignado_a], references: [id], onDelete: SetNull)
+  archivos        ProcesoArchivo[]
+  datos_ia        ProcesosDatosIa[]
+  historial       ProcesosHistorial[]
+  colas_trabajos  AppColasTrabajo[]
+
+  @@index([codigo], name: "idx_proc_codigo")
+  @@index([estado], name: "idx_proc_estado")
+  @@index([tipo], name: "idx_proc_tipo")
+  @@index([prioridad], name: "idx_proc_prioridad")
+  @@index([creado_por], name: "idx_proc_creado")
+  @@index([created_at], name: "idx_proc_fecha_creado")
+  @@map("procesos")
+}
+
+model ProcesoArchivo {
+  id              Int      @id @default(autoincrement())
+  proceso_id      Int
+  nombre_original String   @db.VarChar(255)
+  nombre_archivo  String   @db.VarChar(255)
+  ruta_storage    String   @db.VarChar(500)
+  driver          String   @default("local") @db.VarChar(20)
+  tipo            String   @default("anexo") @db.VarChar(50)
+  mime_type       String?  @db.VarChar(100)
+  tamanio_bytes   Int?
+  hash_sha256     String?  @db.Char(64)
+  orden           Int      @default(0)
+  subido_por      Int?
+  created_at      DateTime @default(now())
+
+  proceso          Proceso          @relation(fields: [proceso_id], references: [id], onDelete: Cascade)
+  subido_por_user  ControlUsuario?  @relation("ArchivosSubidos", fields: [subido_por], references: [id], onDelete: SetNull)
+
+  @@index([proceso_id], name: "idx_arch_proceso")
+  @@index([tipo], name: "idx_arch_tipo")
+  @@index([hash_sha256], name: "idx_arch_hash")
+  @@map("procesos_archivos")
+}
+
+model ProcesosDatosIa {
+  id               Int       @id @default(autoincrement())
+  proceso_id       Int
+  version          Int       @default(1)
+  datos_originales Json
+  datos_validados  Json?
+  metadata         Json?
+  modelo           String?   @db.VarChar(50)
+  tokens_total     Int?
+  fecha_analisis   DateTime  @default(now())
+  validado_por     Int?
+  fecha_validacion DateTime? @db.DateTime
+
+  proceso            Proceso          @relation(fields: [proceso_id], references: [id], onDelete: Cascade)
+  validado_por_user  ControlUsuario?  @relation("DatosIaValidador", fields: [validado_por], references: [id], onDelete: SetNull)
+
+  @@index([proceso_id], name: "idx_diag_proceso")
+  @@index([version], name: "idx_diag_version")
+  @@index([fecha_analisis], name: "idx_diag_fecha")
+  @@map("procesos_datos_ia")
+}
+
+model ProcesosHistorial {
+  id             Int      @id @default(autoincrement())
+  proceso_id     Int
+  usuario_id     Int?
+  accion         String   @db.VarChar(50)
+  estado_anterior String? @db.VarChar(30)
+  estado_nuevo   String?   @db.VarChar(30)
+  descripcion    String?
+  datos_cambio   Json?
+  fecha          DateTime @default(now())
+
+  proceso Proceso          @relation(fields: [proceso_id], references: [id], onDelete: Cascade)
+  usuario ControlUsuario?  @relation("HistorialUsuario", fields: [usuario_id], references: [id], onDelete: SetNull)
+
+  @@index([proceso_id], name: "idx_hist_proceso")
+  @@index([usuario_id], name: "idx_hist_usuario")
+  @@index([accion], name: "idx_hist_accion")
+  @@index([fecha], name: "idx_hist_fecha")
+  @@map("procesos_historial")
+}

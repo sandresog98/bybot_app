@@ -1,0 +1,30 @@
+{
+  "name": "bybot-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "App ByBot — Carga de archivos + análisis IA. Monorepo Node/TS.",
+  "workspaces": [
+    "backend",
+    "frontend",
+    "botstorage"
+  ],
+  "scripts": {
+    "dev": "concurrently -n backend,frontend,botstorage -c blue,magenta,yellow \"npm:dev:backend\" \"npm:dev:frontend\" \"npm:dev:botstorage\"",
+    "dev:backend": "npm -w backend run dev",
+    "dev:frontend": "npm -w frontend run dev",
+    "dev:botstorage": "npm -w botstorage run dev",
+    "build": "npm -w backend run build && npm -w frontend run build && npm -w botstorage run build",
+    "db:reset": "/opt/lampp/bin/mysql -u root < sql/reset_db.sql",
+    "db:studio": "npm -w backend run db:studio",
+    "db:generate": "npm -w backend run db:generate",
+    "lint": "eslint . --ext .ts,.tsx",
+    "typecheck": "npm -w backend run typecheck && npm -w frontend run typecheck && npm -w botstorage run typecheck"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1",
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": "^18 || ^20"
+  }
+}

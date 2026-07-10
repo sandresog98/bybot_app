@@ -1,0 +1,62 @@
+# Node / npm
+node_modules/
+dist/
+build/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Build artifacts
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# TypeScript
+*.tsbuildinfo
+
+# Python artifacts (bots/ y botworker/)
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+bots/venv/
+bots/.env
+botworker/.venv/
+botworker/__pycache__/
+
+# Bot artifacts (salidas HTML/PDF, CSVs de auditoría, pruebas)
+bots/*/salidas_*/*
+!bots/*/salidas_*/.gitkeep
+bots/*/*_consultas.csv
+bots/resultados_pruebas/*
+!bots/resultados_pruebas/.gitkeep
+
+# Prisma
+backend/prisma/migrations/dev.db*
+*.db-journal
+
+# Venvs Python locales (workspaces)
+.venv/
+venv/
+botworker/.venv/
+
+# App uploads & logs (carpetas con .gitkeep)
+uploads/*
+!uploads/.gitkeep
+logs/*
+!logs/.gitkeep
+
+# Helper proceso dev
+.dev-pids
+dev-bg.sh.local
+
+# Editor
+.cursor/
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

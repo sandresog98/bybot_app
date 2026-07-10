@@ -1,0 +1,52 @@
+/* =============================================================================
+   variables.css — Paleta y tokens de diseño de ByBot
+   Norma project_rules.md §1.5 – §1.6:
+     Colores corporativos: Azul #003268, Gris #7D7D7D, Azul 2 #1D4191
+     Fuente: Poppins ExtraBold
+   ============================================================================= */
+
+:root {
+    /* Paleta corporativa */
+    --by-azul:        #003268;
+    --by-azul-2:      #1D4191;
+    --by-gris:        #7D7D7D;
+
+    /* Derivados (sombras, fondos, acentos) */
+    --by-azul-claro:  #2A5BA8;
+    --by-azul-suave:  #EAF1FB;
+    --by-gris-claro:  #B3B3B3;
+    --by-gris-suave:  #F5F6F8;
+    --by-fondo:       #F4F6FA;
+    --by-fondo-card:  #FFFFFF;
+    --by-borde:       #E5E9F0;
+
+    /* Bootstrap overrides */
+    --bs-primary:        var(--by-azul-2);
+    --bs-primary-rgb:    29, 65, 145;
+    --bs-body-bg:        var(--by-fondo);
+    --bs-body-color:     #1E2A37;
+    --bs-link-color:     var(--by-azul-2);
+    --bs-link-hover-color: var(--by-azul);
+    --bs-font-sans-serif: "Poppins", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --bs-heading-color:  var(--by-azul);
+
+    /* Tipografía */
+    --by-fuente-titulo: "Poppins", "Poppins ExtraBold", "Segoe UI", sans-serif;
+
+    /* Tipos de estado */
+    --by-ok:    #199E5B;
+    --by-warn:  #E0A106;
+    --by-err:   #D64545;
+    --by-info:  #2B7DC4;
+
+    /* Bordes/sombras */
+    --by-radius:        10px;
+    --by-radius-sm:     6px;
+    --by-sombra:        0 1px 3px rgba(0, 0, 0, .06), 0 4px 16px rgba(0, 50, 104, .06);
+    --by-sombra-hover:  0 2px 6px rgba(0, 0, 0, .08), 0 8px 24px rgba(0, 50, 104, .12);
+
+    /* Layout */
+    --by-sidebar-w:    256px;
+    --by-sidebar-w-colapsado: 72px;
+    --by-header-h:     64px;
+}
