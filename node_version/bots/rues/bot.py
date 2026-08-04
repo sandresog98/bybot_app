@@ -8,8 +8,8 @@ import unicodedata
 from zoneinfo import ZoneInfo
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
-from playwright.sync_api import sync_playwright
 
+from common.browser import crear_contexto_persistente
 from common.logging_config import configurar_logging, silenciar_logs_ruidosos
 
 logger = logging.getLogger(__name__)
@@ -134,63 +134,59 @@ def ejecutar_consulta(
     keep_open_after_step: bool = False,
 ) -> dict[str, str]:
     logger.info("Abriendo RUES: %s", URL_RUES)
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=headless)
-        context = browser.new_context(
-            viewport={"width": 1366, "height": 900},
-            locale="es-CO",
-            timezone_id="America/Bogota",
-        )
-        page = context.new_page()
-        page.set_default_timeout(30000)
+    pw, context = crear_contexto_persistente(
+        headless=headless,
+        default_timeout=30000,
+    )
+    page = context.new_page()
 
-        try:
-            _abrir_rues(page)
-            page.wait_for_timeout(1500)
+    try:
+        _abrir_rues(page)
+        page.wait_for_timeout(1500)
 
-            _cerrar_modal_inicial(page)
+        _cerrar_modal_inicial(page)
 
-            input_busqueda = page.locator("input#search[name='search']").first
-            input_busqueda.wait_for(state="visible", timeout=15000)
-            input_busqueda.fill(numero_busqueda)
-            logger.info("Numero escrito en Registro Mercantil: %s", numero_busqueda)
+        input_busqueda = page.locator("input#search[name='search']").first
+        input_busqueda.wait_for(state="visible", timeout=15000)
+        input_busqueda.fill(numero_busqueda)
+        logger.info("Numero escrito en Registro Mercantil: %s", numero_busqueda)
 
-            _clic_boton_buscar(page, input_busqueda)
+        _clic_boton_buscar(page, input_busqueda)
 
-            estado = _esperar_estado_consulta(page)
-            url_final = page.url
+        estado = _esperar_estado_consulta(page)
+        url_final = page.url
 
-            if estado == "FINALIZADO":
-                return {
-                    "estado": "FINALIZADO",
-                    "motivo": "No se encontraron resultados.",
-                    "url_final": url_final,
-                    "archivo_html": "",
-                }
-
-            html_resultado = page.content()
-            archivo_html = _guardar_html_resultado(
-                html_resultado, numero_busqueda=numero_busqueda
-            )
+        if estado == "FINALIZADO":
             return {
-                "estado": "EXITOSA",
-                "motivo": "Consulta encontrada en RUES.",
+                "estado": "FINALIZADO",
+                "motivo": "No se encontraron resultados.",
                 "url_final": url_final,
-                "archivo_html": str(archivo_html),
-            }
-        except Exception as exc:
-            logger.error("Error en flujo RUES: %s", exc)
-            return {
-                "estado": "ERROR",
-                "motivo": _motivo_error_corto(exc),
-                "url_final": page.url if page else "",
                 "archivo_html": "",
             }
-        finally:
-            if (not headless) and keep_open_after_step:
-                try:
-                    input()
-                except EOFError:
-                    pass
-            context.close()
-            browser.close()
+
+        html_resultado = page.content()
+        archivo_html = _guardar_html_resultado(
+            html_resultado, numero_busqueda=numero_busqueda
+        )
+        return {
+            "estado": "EXITOSA",
+            "motivo": "Consulta encontrada en RUES.",
+            "url_final": url_final,
+            "archivo_html": str(archivo_html),
+        }
+    except Exception as exc:
+        logger.error("Error en flujo RUES: %s", exc)
+        return {
+            "estado": "ERROR",
+            "motivo": _motivo_error_corto(exc),
+            "url_final": page.url if page else "",
+            "archivo_html": "",
+        }
+    finally:
+        if (not headless) and keep_open_after_step:
+            try:
+                input()
+            except EOFError:
+                pass
+        context.close()
+        pw.stop()

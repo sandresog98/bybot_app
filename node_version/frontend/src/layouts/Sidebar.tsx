@@ -9,11 +9,11 @@ const CATALOG: Record<string, { icon: string; label: string; path: string }> = {
   configuracion: { icon: 'gear',         label: 'Configuración', path: '/configuracion' },
 };
 
-interface Props { modulos: string[] }
+interface Props { modulos: string[]; open: boolean; onClose: () => void; }
 
-export default function Sidebar({ modulos }: Props) {
+export default function Sidebar({ modulos, open, onClose }: Props) {
   return (
-    <aside className="app-sidebar">
+    <aside className={`app-sidebar ${open ? 'open' : ''}`}>
       <div className="logo">
         <span style={{ visibility: 'visible' }}>ByBot</span>
         <small>App de casos</small>
@@ -29,9 +29,10 @@ export default function Sidebar({ modulos }: Props) {
               className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
               data-page={m}
               end={m === 'dashboard'}
+              onClick={onClose}
             >
               <i className={`bi bi-${c.icon}`} />
-              <span>{c.label}</span>
+              <span className="nav-label">{c.label}</span>
             </NavLink>
           );
         })}

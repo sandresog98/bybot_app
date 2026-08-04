@@ -1,7 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 
-export default function Header() {
+interface Props { onToggleSidebar: () => void; }
+
+export default function Header({ onToggleSidebar }: Props) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -12,6 +14,9 @@ export default function Header() {
 
   return (
     <header className="app-header">
+      <button className="btn btn-link d-md-none text-dark p-0 me-2" onClick={onToggleSidebar}>
+        <i className="bi bi-list fs-4" />
+      </button>
       <h1 className="h5 mb-0">ByBot App</h1>
       <div className="ms-auto d-flex align-items-center gap-2">
         <span className="badge bg-light text-secondary fw-normal">

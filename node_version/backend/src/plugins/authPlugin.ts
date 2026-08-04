@@ -16,11 +16,18 @@ declare module 'fastify' {
 
 export default fp(async (app: FastifyInstance) => {
   app.decorate('requireAuth', async (req: FastifyRequest) => {
+    // Aceptar token en header Authorization o query (?t=)
+    let token: string | null = null;
     const auth = req.headers.authorization;
-    if (!auth || !auth.startsWith('Bearer ')) {
+    if (auth && auth.startsWith('Bearer ')) {
+      token = auth.slice(7).trim();
+    } else {
+      const q = req.query as { t?: string };
+      if (typeof q.t === 'string') token = q.t;
+    }
+    if (!token) {
       throw app.httpErrors.unauthorized('Falta token de autenticación.');
     }
-    const token = auth.slice(7).trim();
     const payload = await verifyAccessToken(token);
     if (!payload) {
       throw app.httpErrors.unauthorized('Token inválido o expirado.');

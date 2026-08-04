@@ -11,10 +11,12 @@ import { healthRoutes } from './modules/health.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import { dashboardRoutes } from './modules/dashboard/dashboard.routes.js';
 import { procesosRoutes } from './modules/procesos/procesos.routes.js';
+import { archivosRoutes } from './modules/archivos/archivos.routes.js';
 import { analisisRoutes } from './modules/analisis/analisis.routes.js';
 import { promptsRoutes } from './modules/prompts/prompts.routes.js';
 import { usuariosRoutes } from './modules/usuarios/usuarios.routes.js';
 import { configuracionRoutes } from './modules/configuracion/configuracion.routes.js';
+import { consultasRoutes } from './modules/consultas/consultas.routes.js';
 
 async function main() {
   const app = Fastify({
@@ -42,10 +44,12 @@ async function main() {
     await api.register(authRoutes, { prefix: '/auth' });
     await api.register(dashboardRoutes, { prefix: '/dashboard' });
     await api.register(procesosRoutes, { prefix: '/procesos' });
-    await api.register(analisisRoutes, { prefix: '/analisis' });
+    await api.register(archivosRoutes); // rutas /procesos/:id/archivos + /archivos/*
+    await api.register(analisisRoutes);  // rutas /procesos/:id/analizar + /procesos/:id/analisis/*
     await api.register(promptsRoutes, { prefix: '/prompts' });
     await api.register(usuariosRoutes, { prefix: '/usuarios' });
     await api.register(configuracionRoutes, { prefix: '/configuracion' });
+    await api.register(consultasRoutes); // rutas /procesos/:id/consultar + /consultas/:id
   }, { prefix: '/api/v1' });
 
   app.setErrorHandler((err, _req, rep) => {

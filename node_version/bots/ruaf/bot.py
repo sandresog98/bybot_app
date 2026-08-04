@@ -25,8 +25,9 @@ from pathlib import Path
 from urllib.parse import urljoin
 
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
-from playwright.sync_api import Page, sync_playwright, TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
 
+from common.browser import crear_contexto_persistente
 from common.logging_config import configurar_logging, silenciar_logs_ruidosos
 from common.storage import registrar_consulta
 from common.ai import resolver_captcha_ocr, extraer_datos_reporte_imagen
@@ -56,6 +57,12 @@ MSG_NO_INFO_2 = (
     "La fecha de expedicion o nacimiento no coincide con la la informacion reportada "
     "en las tablas de referencia del Ministerio de Salud y Proteccion Social, Por favor verifique!"
 )
+MSG_SERVER_ERROR_1 = (
+    "Ocurrio un error al realizar la consulta por favor intente mas tarde"
+)
+MSG_SERVER_ERROR_2 = (
+    "Server-unavailable!"
+)
 
 
 def _norm_captcha(s: str) -> str:
@@ -77,7 +84,18 @@ def _voto_por_posicion(textos_5: list[str]) -> str:
 
 def esperar_pagina_consulta_tras_terminos(page: Page) -> None:
     sel = "#MainContent_ddlTiposDocumentos, select[name='ctl00$MainContent$ddlTiposDocumentos']"
-    page.wait_for_selector(sel, state="visible", timeout=90000)
+    timeout = 90000
+    try:
+        page.wait_for_selector(sel, state="visible", timeout=timeout)
+    except PlaywrightTimeoutError:
+        body_text = (page.locator("body").inner_text() or "").strip()
+        if not body_text:
+            raise
+        motivo = detectar_mensaje_no_exitoso(body_text)
+        if motivo:
+            logger.warning("Server error detected in terminos page: %s", motivo)
+            raise RuntimeError(f"Server error en pantalla de terminos: {motivo}")
+        raise
 
 
 def esperar_tras_consultar(page: Page) -> None:
@@ -312,6 +330,12 @@ def detectar_mensaje_no_exitoso(texto: str) -> str | None:
     t = " ".join(_sin_tildes(texto).split()).lower()
     m1 = " ".join(_sin_tildes(MSG_NO_INFO_1).split()).lower()
     m2 = " ".join(_sin_tildes(MSG_NO_INFO_2).split()).lower()
+    s1 = " ".join(_sin_tildes(MSG_SERVER_ERROR_1).split()).lower()
+    s2 = " ".join(_sin_tildes(MSG_SERVER_ERROR_2).split()).lower()
+    if s1 in t:
+        return MSG_SERVER_ERROR_1
+    if s2 in t:
+        return MSG_SERVER_ERROR_2
     if m1 in t:
         return MSG_NO_INFO_1
     if m2 in t:
@@ -572,124 +596,74 @@ def ejecutar_consulta(
         captchas_dir or "(no se guardan imagenes)",
     )
 
-    with sync_playwright() as p:
-        logger.info("Iniciando navegador Chromium...")
-        browser = p.chromium.launch(headless=headless)
-        context = browser.new_context(
-            viewport={"width": 1280, "height": 900},
-            locale="es-CO",
-            timezone_id="America/Bogota",
-        )
-        page = context.new_page()
-        page.set_default_timeout(60000)
-        logger.debug("Timeout por defecto de pagina: 60000 ms")
+    pw, context = crear_contexto_persistente(
+        headless=headless,
+        default_timeout=60000,
+    )
+    page = context.new_page()
+    logger.debug("Timeout por defecto de pagina: 60000 ms")
 
-        try:
-            def preparar_formulario() -> None:
-                logger.info("Paso 1/... Abriendo terminos: %s", DEFAULT_URL_INICIO)
-                page.goto(DEFAULT_URL_INICIO, wait_until="domcontentloaded")
-                logger.info("Pagina cargada (domcontentloaded). URL actual: %s", page.url)
+    try:
+        def preparar_formulario() -> None:
+            logger.info("Paso 1/... Abriendo terminos: %s", DEFAULT_URL_INICIO)
+            page.goto(DEFAULT_URL_INICIO, wait_until="domcontentloaded")
+            logger.info("Pagina cargada (domcontentloaded). URL actual: %s", page.url)
 
-                logger.info("Paso 2/... Marcando radio MainContent_RadioButtonList1_0 y enviando formulario")
-                page.locator("#MainContent_RadioButtonList1_0").click()
-                page.locator("#MainContent_btnEnviar, input[name='ctl00$MainContent$btnEnviar']").first.click()
-                logger.info("Esperando pantalla de consulta (selector tipo documento; no networkidle)...")
-                esperar_pagina_consulta_tras_terminos(page)
-                logger.info("Formulario enviado. URL: %s", page.url)
+            logger.info("Paso 2/... Marcando radio MainContent_RadioButtonList1_0 y enviando formulario")
+            page.locator("#MainContent_RadioButtonList1_0").click()
+            page.locator("#MainContent_btnEnviar, input[name='ctl00$MainContent$btnEnviar']").first.click()
+            logger.info("Esperando pantalla de consulta (selector tipo documento; no networkidle)...")
+            esperar_pagina_consulta_tras_terminos(page)
+            logger.info("Formulario enviado. URL: %s", page.url)
 
-                logger.info("Paso 3/... Rellenando formulario de consulta")
-                seleccionar_tipo_documento(page, tipo_doc)
-                page.locator(
-                    "#MainContent_txbNumeroIdentificacion, input[name='ctl00$MainContent$txbNumeroIdentificacion']"
-                ).fill(numero_id)
-                logger.info("Numero identificacion: %s", numero_id)
+            logger.info("Paso 3/... Rellenando formulario de consulta")
+            seleccionar_tipo_documento(page, tipo_doc)
+            page.locator(
+                "#MainContent_txbNumeroIdentificacion, input[name='ctl00$MainContent$txbNumeroIdentificacion']"
+            ).fill(numero_id)
+            logger.info("Numero identificacion: %s", numero_id)
 
-                datepicker = page.locator("#MainContent_datepicker, input[name='ctl00$MainContent$datepicker']")
-                datepicker.click()
-                datepicker.fill("")
-                datepicker.fill(fecha)
-                logger.info("Fecha (DD/MM/YYYY): %s", fecha)
-                try:
-                    page.keyboard.press("Tab")
-                except Exception as e:
-                    logger.debug("Tab tras fecha: %s", e)
-                cerrar_datepicker_jquery_ui(page)
-                logger.info("Datepicker cerrado (listo para captcha / Verificar).")
+            datepicker = page.locator("#MainContent_datepicker, input[name='ctl00$MainContent$datepicker']")
+            datepicker.click()
+            datepicker.fill("")
+            datepicker.fill(fecha)
+            logger.info("Fecha (DD/MM/YYYY): %s", fecha)
+            try:
+                page.keyboard.press("Tab")
+            except Exception as e:
+                logger.debug("Tab tras fecha: %s", e)
+            cerrar_datepicker_jquery_ui(page)
+            logger.info("Datepicker cerrado (listo para captcha / Verificar).")
 
-            preparar_formulario()
-            mensaje = page.locator("#MainContent_lblMessage, span[id='MainContent_lblMessage']")
-            ultima_firma_captcha = ""
-            repeticiones_captcha = 0
-            fallos_captcha_fuente = 0
-            reinicios_formulario = 0
+        preparar_formulario()
+        mensaje = page.locator("#MainContent_lblMessage, span[id='MainContent_lblMessage']")
+        ultima_firma_captcha = ""
+        repeticiones_captcha = 0
+        fallos_captcha_fuente = 0
+        reinicios_formulario = 0
 
-            logger.info("Paso 4/... Bucle captcha (max. %s intentos)", MAX_INTENTOS_CAPTCHA)
-            for intento in range(1, MAX_INTENTOS_CAPTCHA + 1):
-                logger.info("--- Intento captcha %s/%s ---", intento, MAX_INTENTOS_CAPTCHA)
-                try:
-                    cap_img = localizar_imagen_captcha(page)
-                except Exception as e:
-                    fallos_captcha_fuente += 1
-                    logger.warning(
-                        "Captcha no localizado (fallo %s/%s): %s",
-                        fallos_captcha_fuente,
-                        MAX_FALLOS_CAPTCHA_FUENTE,
-                        e,
-                    )
-                    if fallos_captcha_fuente >= MAX_FALLOS_CAPTCHA_FUENTE:
-                        if reinicios_formulario < MAX_REINICIOS_FORMULARIO:
-                            reinicios_formulario += 1
-                            logger.warning(
-                                "Se alcanzaron %s fallos de captcha. Reiniciando flujo de formulario (%s/%s)...",
-                                MAX_FALLOS_CAPTCHA_FUENTE,
-                                reinicios_formulario,
-                                MAX_REINICIOS_FORMULARIO,
-                            )
-                            preparar_formulario()
-                            fallos_captcha_fuente = 0
-                            ultima_firma_captcha = ""
-                            repeticiones_captcha = 0
-                            time.sleep(0.8)
-                            continue
-                        return {
-                            "estado": "ERROR_PAGINA_CAPTCHA",
-                            "motivo": (
-                                "La pagina no esta entregando captcha valido "
-                                "(imagen ausente/no cargada) tras varios reinicios."
-                            ),
-                            "archivo_html": "",
-                        }
-                    forzar_renovacion_captcha(page)
-                    time.sleep(0.6)
-                    continue
-
-                estado_imagen = detectar_imagen_captcha_rota(page)
-                if estado_imagen in ("rota", "no_encontrada"):
-                    logger.warning(
-                        "Imagen captcha rota o no encontrada (estado=%s). Reiniciando formulario.", estado_imagen
-                    )
+        logger.info("Paso 4/... Bucle captcha (max. %s intentos)", MAX_INTENTOS_CAPTCHA)
+        for intento in range(1, MAX_INTENTOS_CAPTCHA + 1):
+            logger.info("--- Intento captcha %s/%s ---", intento, MAX_INTENTOS_CAPTCHA)
+            try:
+                cap_img = localizar_imagen_captcha(page)
+            except Exception as e:
+                fallos_captcha_fuente += 1
+                logger.warning(
+                    "Captcha no localizado (fallo %s/%s): %s",
+                    fallos_captcha_fuente,
+                    MAX_FALLOS_CAPTCHA_FUENTE,
+                    e,
+                )
+                if fallos_captcha_fuente >= MAX_FALLOS_CAPTCHA_FUENTE:
                     if reinicios_formulario < MAX_REINICIOS_FORMULARIO:
                         reinicios_formulario += 1
-                        preparar_formulario()
-                        fallos_captcha_fuente = 0
-                        repeticiones_captcha = 0
-                        time.sleep(0.8)
-                        continue
-                    return {
-                        "estado": "ERROR_PAGINA_CAPTCHA",
-                        "motivo": (
-                            "La imagen del captcha esta rota o no carga "
-                            "tras varios reinicios del formulario."
-                        ),
-                        "archivo_html": "",
-                    }
-
-                try:
-                    png = obtener_png_captcha(page, cap_img)
-                except Exception as e:
-                    logger.warning("No se pudo obtener imagen captcha en intento %s: %s. Reiniciando formulario.", intento, e)
-                    if reinicios_formulario < MAX_REINICIOS_FORMULARIO:
-                        reinicios_formulario += 1
+                        logger.warning(
+                            "Se alcanzaron %s fallos de captcha. Reiniciando flujo de formulario (%s/%s)...",
+                            MAX_FALLOS_CAPTCHA_FUENTE,
+                            reinicios_formulario,
+                            MAX_REINICIOS_FORMULARIO,
+                        )
                         preparar_formulario()
                         fallos_captcha_fuente = 0
                         ultima_firma_captcha = ""
@@ -700,211 +674,257 @@ def ejecutar_consulta(
                         "estado": "ERROR_PAGINA_CAPTCHA",
                         "motivo": (
                             "La pagina no esta entregando captcha valido "
-                            "(fallo al capturar imagen) tras varios reinicios."
+                            "(imagen ausente/no cargada) tras varios reinicios."
                         ),
                         "archivo_html": "",
                     }
-                ok_png, motivo_png = validar_png_captcha(png)
-                if not ok_png:
-                    logger.warning(
-                        "Captcha invalido/no cargado (%s). Reiniciando formulario.", motivo_png
-                    )
-                    if reinicios_formulario < MAX_REINICIOS_FORMULARIO:
-                        reinicios_formulario += 1
-                        preparar_formulario()
-                        fallos_captcha_fuente = 0
-                        ultima_firma_captcha = ""
-                        repeticiones_captcha = 0
-                        time.sleep(0.8)
-                        continue
-                    return {
-                        "estado": "ERROR_PAGINA_CAPTCHA",
-                        "motivo": (
-                            "La pagina devuelve contenido invalido en el captcha "
-                            "(HTML/imagen rota) tras varios reinicios."
-                        ),
-                        "archivo_html": "",
-                    }
-                fallos_captcha_fuente = 0
+                forzar_renovacion_captcha(page)
+                time.sleep(0.6)
+                continue
 
-                firma = hashlib.sha1(png).hexdigest()
-                if firma == ultima_firma_captcha:
-                    repeticiones_captcha += 1
-                else:
+            estado_imagen = detectar_imagen_captcha_rota(page)
+            if estado_imagen in ("rota", "no_encontrada"):
+                logger.warning(
+                    "Imagen captcha rota o no encontrada (estado=%s). Reiniciando formulario.", estado_imagen
+                )
+                if reinicios_formulario < MAX_REINICIOS_FORMULARIO:
+                    reinicios_formulario += 1
+                    preparar_formulario()
+                    fallos_captcha_fuente = 0
                     repeticiones_captcha = 0
-                    ultima_firma_captcha = firma
-                if repeticiones_captcha >= 1:
-                    logger.warning(
-                        "Captcha repetido detectado (hash igual). Forzando renovacion e intentando de nuevo..."
-                    )
-                    forzar_renovacion_captcha(page)
+                    time.sleep(0.8)
                     continue
-
-                pil = Image.open(io.BytesIO(png))
-                texto, estrategia = leer_captcha_multipass(pil)
-
-                if len(texto) != 5:
-                    texto_gemini = resolver_captcha_ocr(png)
-                    if texto_gemini and len(texto_gemini) == 5:
-                        texto = texto_gemini
-                        estrategia = "gemini_fallback"
-                        logger.info("Gemini resolvio captcha donde Tesseract fallo: %r", texto)
-                    else:
-                        if captchas_dir is not None:
-                            guardar_intento_captcha(captchas_dir, intento, pil, texto, estrategia)
-                        logger.warning(
-                            "OCR no devolvio 5 caracteres y Gemini tampoco; "
-                            "forzando renovacion de captcha y reintentando..."
-                        )
-                        forzar_renovacion_captcha(page)
-                        time.sleep(0.6)
-                        cerrar_datepicker_jquery_ui(page)
-                        continue
-
-                if captchas_dir is not None:
-                    guardar_intento_captcha(captchas_dir, intento, pil, texto, estrategia)
-                logger.info("Texto captcha: %r (longitud=%s, estrategia=%s)", texto, len(texto), estrategia)
-
-                page.locator("#MainContent_txtCaptcha, input[name='ctl00$MainContent$txtCaptcha']").fill(texto)
-                logger.info("Captcha escrito en txtCaptcha; pulsando Verificar...")
-                cerrar_datepicker_jquery_ui(page)
-                page.locator("#MainContent_btnVerify, input[name='ctl00$MainContent$btnVerify']").click()
-
-                try:
-                    mensaje.wait_for(state="visible", timeout=POST_VERIFY_WAIT_MS)
-                    logger.debug("lblMessage visible")
-                except PlaywrightTimeoutError:
-                    logger.warning(
-                        "lblMessage no quedo visible en %s ms; se leera el texto igualmente",
-                        POST_VERIFY_WAIT_MS,
-                    )
-
-                txt = ""
-                try:
-                    txt = (mensaje.inner_text() or "").strip()
-                except Exception as e:
-                    logger.debug("No se pudo leer inner_text de lblMessage: %s", e)
-
-                logger.info("Mensaje verificacion captcha: %r", txt)
-
-                if "Texto Valido" in txt or "Texto Válido" in txt:
-                    logger.info("Captcha aceptado (Texto Valido).")
-                    break
-                if "Texto Invalido" in txt or "Texto Inválido" in txt:
-                    if intento == MAX_INTENTOS_CAPTCHA:
-                        raise RuntimeError("Captcha invalido tras el maximo de intentos.")
-                    logger.warning(
-                        "Captcha rechazado; el sitio regenera la imagen y limpia el campo. "
-                        "Forzando renovacion por seguridad y reintentando OCR..."
-                    )
-                    forzar_renovacion_captcha(page)
-                    time.sleep(0.85)
-                    cerrar_datepicker_jquery_ui(page)
-                    continue
-                logger.warning("Mensaje inesperado o vacio; reintentando en 0.5s...")
-                if intento == MAX_INTENTOS_CAPTCHA:
-                    raise RuntimeError(f"No se obtuvo mensaje esperado. Ultimo texto: {txt!r}")
-                time.sleep(0.5)
-            else:
-                raise RuntimeError("No se valido el captcha.")
-
-            logger.info("Paso 5/... Pulsando Consultar")
-            page.locator("#MainContent_btnConsultar, input[name='ctl00$MainContent$btnConsultar']").click()
-            esperar_tras_consultar(page)
-            logger.info("Tras Consultar. URL: %s", page.url)
-
-            texto_pagina = (page.locator("body").inner_text() or "").strip()
-            motivo_no_exitoso = detectar_mensaje_no_exitoso(texto_pagina)
-            if motivo_no_exitoso:
-                logger.warning("Consulta no exitosa por mensaje final: %s", motivo_no_exitoso)
                 return {
-                    "estado": "NO_EXITOSA_NEGOCIO",
-                    "motivo": motivo_no_exitoso,
+                    "estado": "ERROR_PAGINA_CAPTCHA",
+                    "motivo": (
+                        "La imagen del captcha esta rota o no carga "
+                        "tras varios reinicios del formulario."
+                    ),
                     "archivo_html": "",
                 }
 
-            selector_reporte = "#ctl00_MainContent_rvConsulta_ctl13"
+            try:
+                png = obtener_png_captcha(page, cap_img)
+            except Exception as e:
+                logger.warning("No se pudo obtener imagen captcha en intento %s: %s. Reiniciando formulario.", intento, e)
+                if reinicios_formulario < MAX_REINICIOS_FORMULARIO:
+                    reinicios_formulario += 1
+                    preparar_formulario()
+                    fallos_captcha_fuente = 0
+                    ultima_firma_captcha = ""
+                    repeticiones_captcha = 0
+                    time.sleep(0.8)
+                    continue
+                return {
+                    "estado": "ERROR_PAGINA_CAPTCHA",
+                    "motivo": (
+                        "La pagina no esta entregando captcha valido "
+                        "(fallo al capturar imagen) tras varios reinicios."
+                    ),
+                    "archivo_html": "",
+                }
+            ok_png, motivo_png = validar_png_captcha(png)
+            if not ok_png:
+                logger.warning(
+                    "Captcha invalido/no cargado (%s). Reiniciando formulario.", motivo_png
+                )
+                if reinicios_formulario < MAX_REINICIOS_FORMULARIO:
+                    reinicios_formulario += 1
+                    preparar_formulario()
+                    fallos_captcha_fuente = 0
+                    ultima_firma_captcha = ""
+                    repeticiones_captcha = 0
+                    time.sleep(0.8)
+                    continue
+                return {
+                    "estado": "ERROR_PAGINA_CAPTCHA",
+                    "motivo": (
+                        "La pagina devuelve contenido invalido en el captcha "
+                        "(HTML/imagen rota) tras varios reinicios."
+                    ),
+                    "archivo_html": "",
+                }
+            fallos_captcha_fuente = 0
 
-            def extraer_ctl13() -> str | None:
-                for fr in page.frames:
-                    try:
-                        loc = fr.locator(selector_reporte)
-                        if loc.count() > 0:
-                            return loc.first.evaluate("el => el.outerHTML")
-                    except Exception:
-                        continue
+            firma = hashlib.sha1(png).hexdigest()
+            if firma == ultima_firma_captcha:
+                repeticiones_captcha += 1
+            else:
+                repeticiones_captcha = 0
+                ultima_firma_captcha = firma
+            if repeticiones_captcha >= 1:
+                logger.warning(
+                    "Captcha repetido detectado (hash igual). Forzando renovacion e intentando de nuevo..."
+                )
+                forzar_renovacion_captcha(page)
+                continue
+
+            pil = Image.open(io.BytesIO(png))
+            texto_gemini = resolver_captcha_ocr(png)
+            if texto_gemini and len(texto_gemini) == 5:
+                texto = texto_gemini
+                estrategia = "gemini"
+                logger.info("Gemini resolvio captcha: %r", texto)
+            else:
+                texto, estrategia = leer_captcha_multipass(pil)
+                if len(texto) == 5:
+                    logger.info("OCR resolvio captcha donde Gemini fallo: %r", texto)
+                else:
+                    if captchas_dir is not None:
+                        guardar_intento_captcha(captchas_dir, intento, pil, texto, estrategia)
+                    logger.warning(
+                        "OCR no devolvio 5 caracteres y Gemini tampoco; "
+                        "forzando renovacion de captcha y reintentando..."
+                    )
+                    forzar_renovacion_captcha(page)
+                    time.sleep(0.6)
+                    cerrar_datepicker_jquery_ui(page)
+                    continue
+
+            if captchas_dir is not None:
+                guardar_intento_captcha(captchas_dir, intento, pil, texto, estrategia)
+            logger.info("Texto captcha: %r (longitud=%s, estrategia=%s)", texto, len(texto), estrategia)
+
+            page.locator("#MainContent_txtCaptcha, input[name='ctl00$MainContent$txtCaptcha']").fill(texto)
+            logger.info("Captcha escrito en txtCaptcha; pulsando Verificar...")
+            cerrar_datepicker_jquery_ui(page)
+            page.locator("#MainContent_btnVerify, input[name='ctl00$MainContent$btnVerify']").click()
+
+            try:
+                mensaje.wait_for(state="visible", timeout=POST_VERIFY_WAIT_MS)
+                logger.debug("lblMessage visible")
+            except PlaywrightTimeoutError:
+                logger.warning(
+                    "lblMessage no quedo visible en %s ms; se leera el texto igualmente",
+                    POST_VERIFY_WAIT_MS,
+                )
+
+            txt = ""
+            try:
+                txt = (mensaje.inner_text() or "").strip()
+            except Exception as e:
+                logger.debug("No se pudo leer inner_text de lblMessage: %s", e)
+
+            logger.info("Mensaje verificacion captcha: %r", txt)
+
+            if "Texto Valido" in txt or "Texto Válido" in txt:
+                logger.info("Captcha aceptado (Texto Valido).")
+                break
+            if "Texto Invalido" in txt or "Texto Inválido" in txt:
+                if intento == MAX_INTENTOS_CAPTCHA:
+                    raise RuntimeError("Captcha invalido tras el maximo de intentos.")
+                logger.warning(
+                    "Captcha rechazado; el sitio regenera la imagen y limpia el campo. "
+                    "Forzando renovacion por seguridad y reintentando OCR..."
+                )
+                forzar_renovacion_captcha(page)
+                time.sleep(0.85)
+                cerrar_datepicker_jquery_ui(page)
+                continue
+            logger.warning("Mensaje inesperado o vacio; reintentando en 0.5s...")
+            if intento == MAX_INTENTOS_CAPTCHA:
+                raise RuntimeError(f"No se obtuvo mensaje esperado. Ultimo texto: {txt!r}")
+            time.sleep(0.5)
+        else:
+            raise RuntimeError("No se valido el captcha.")
+
+        logger.info("Paso 5/... Pulsando Consultar")
+        page.locator("#MainContent_btnConsultar, input[name='ctl00$MainContent$btnConsultar']").click(no_wait_after=True)
+        esperar_tras_consultar(page)
+        logger.info("Tras Consultar. URL: %s", page.url)
+
+        texto_pagina = (page.locator("body").inner_text() or "").strip()
+        motivo_no_exitoso = detectar_mensaje_no_exitoso(texto_pagina)
+        if motivo_no_exitoso:
+            logger.warning("Consulta no exitosa por mensaje final: %s", motivo_no_exitoso)
+            return {
+                "estado": "NO_EXITOSA_NEGOCIO",
+                "motivo": motivo_no_exitoso,
+                "archivo_html": "",
+            }
+
+        selector_reporte = "#ctl00_MainContent_rvConsulta_ctl13"
+
+        def extraer_ctl13() -> str | None:
+            for fr in page.frames:
                 try:
-                    loc = page.locator(selector_reporte)
+                    loc = fr.locator(selector_reporte)
                     if loc.count() > 0:
                         return loc.first.evaluate("el => el.outerHTML")
                 except Exception:
-                    pass
-                return None
-
-            logger.info("Paso 6/... Esperando elemento reporte %s", selector_reporte)
-            html_fragment = None
-            for espera in range(60):
-                html_fragment = extraer_ctl13()
-                if html_fragment:
-                    logger.info("Elemento encontrado tras ~%s s de sondeo", espera + 1)
-                    break
-                if espera == 0:
-                    logger.info("Aun no visible; reintentando cada 1s (max. 60s)...")
-                time.sleep(1.0)
-            if not html_fragment:
-                logger.info("Esperando selector con wait_for_selector (hasta 120s)...")
-                page.wait_for_selector(selector_reporte, state="attached", timeout=120000)
-                html_fragment = extraer_ctl13()
-            if not html_fragment:
-                raise RuntimeError(
-                    "No se encontro ctl00_MainContent_rvConsulta_ctl13 (cambio el id del ReportViewer?)."
-                )
-
-            logger.info(
-                "Reporte detectado (bloque ctl13 aprox. %s caracteres). Exportando pagina completa...",
-                len(html_fragment),
-            )
-            html_completo = exportar_html_pagina_completa(page)
-            salida_final.write_text(html_completo, encoding="utf-8")
-            logger.info("Paso 7/... Archivo guardado: %s", salida_final.resolve())
-
-            datos_extra = {}
+                    continue
             try:
-                reporte_locator = page.locator(selector_reporte)
-                if reporte_locator.count() > 0:
-                    screenshot_bytes = reporte_locator.first.screenshot(timeout=15000)
-                    campos_reporte = [
-                        {"nombre": "eps_afiliado", "descripcion": "Nombre de la EPS a la que esta afiliado", "ejemplo": "EPS SANITAS S.A."},
-                        {"nombre": "regimen", "descripcion": "Regimen de afiliacion", "ejemplo": "CONTRIBUTIVO"},
-                        {"nombre": "estado_afiliacion", "descripcion": "Estado de la afiliacion", "ejemplo": "ACTIVO"},
-                        {"nombre": "fecha_afiliacion_eps", "descripcion": "Fecha de afiliacion efectiva en formato DD/MM/AAAA", "ejemplo": "01/01/2026"},
-                        {"nombre": "tipo_afiliado", "descripcion": "Tipo de afiliado", "ejemplo": "COTIZANTE"},
-                    ]
-                    extraidos = extraer_datos_reporte_imagen(screenshot_bytes, campos_reporte)
-                    for campo, (valor, fuente) in extraidos.items():
-                        if valor:
-                            datos_extra[campo] = valor
-                            datos_extra[f"{campo}_fuente"] = fuente
-                            logger.info("Gemini Vision extrajo %s: %r", campo, valor)
-                    logger.info("Gemini Vision: %s/%s campos extraidos del reporte",
-                                sum(1 for v in extraidos.values() if v[0]), len(extraidos))
-            except Exception as e:
-                logger.debug("Gemini Vision no pudo extraer datos del reporte: %s", e)
+                loc = page.locator(selector_reporte)
+                if loc.count() > 0:
+                    return loc.first.evaluate("el => el.outerHTML")
+            except Exception:
+                pass
+            return None
 
-            logger.info("Proceso finalizado correctamente.")
-            resultado = {
-                "estado": "EXITOSA",
-                "motivo": "OK",
-                "archivo_html": str(salida_final.resolve()),
-            }
-            if datos_extra:
-                resultado["datos_extraidos"] = datos_extra
-            return resultado
+        logger.info("Paso 6/... Esperando elemento reporte %s", selector_reporte)
+        html_fragment = None
+        for espera in range(60):
+            html_fragment = extraer_ctl13()
+            if html_fragment:
+                logger.info("Elemento encontrado tras ~%s s de sondeo", espera + 1)
+                break
+            if espera == 0:
+                logger.info("Aun no visible; reintentando cada 1s (max. 60s)...")
+            time.sleep(1.0)
+        if not html_fragment:
+            logger.info("Esperando selector con wait_for_selector (hasta 120s)...")
+            page.wait_for_selector(selector_reporte, state="attached", timeout=120000)
+            html_fragment = extraer_ctl13()
+        if not html_fragment:
+            raise RuntimeError(
+                "No se encontro ctl00_MainContent_rvConsulta_ctl13 (cambio el id del ReportViewer?)."
+            )
 
-        finally:
+        logger.info(
+            "Reporte detectado (bloque ctl13 aprox. %s caracteres). Exportando pagina completa...",
+            len(html_fragment),
+        )
+        html_completo = exportar_html_pagina_completa(page)
+        salida_final.write_text(html_completo, encoding="utf-8")
+        logger.info("Paso 7/... Archivo guardado: %s", salida_final.resolve())
+
+        datos_extra = {}
+        try:
+            reporte_locator = page.locator(selector_reporte)
+            if reporte_locator.count() > 0:
+                screenshot_bytes = reporte_locator.first.screenshot(timeout=15000)
+                campos_reporte = [
+                    {"nombre": "eps_afiliado", "descripcion": "Nombre de la EPS a la que esta afiliado", "ejemplo": "EPS SANITAS S.A."},
+                    {"nombre": "regimen", "descripcion": "Regimen de afiliacion", "ejemplo": "CONTRIBUTIVO"},
+                    {"nombre": "estado_afiliacion", "descripcion": "Estado de la afiliacion", "ejemplo": "ACTIVO"},
+                    {"nombre": "fecha_afiliacion_eps", "descripcion": "Fecha de afiliacion efectiva en formato DD/MM/AAAA", "ejemplo": "01/01/2026"},
+                    {"nombre": "tipo_afiliado", "descripcion": "Tipo de afiliado", "ejemplo": "COTIZANTE"},
+                ]
+                extraidos = extraer_datos_reporte_imagen(screenshot_bytes, campos_reporte)
+                for campo, (valor, fuente) in extraidos.items():
+                    if valor:
+                        datos_extra[campo] = valor
+                        datos_extra[f"{campo}_fuente"] = fuente
+                        logger.info("Gemini Vision extrajo %s: %r", campo, valor)
+                logger.info("Gemini Vision: %s/%s campos extraidos del reporte",
+                            sum(1 for v in extraidos.values() if v[0]), len(extraidos))
+        except Exception as e:
+            logger.debug("Gemini Vision no pudo extraer datos del reporte: %s", e)
+
+        logger.info("Proceso finalizado correctamente.")
+        resultado = {
+            "estado": "EXITOSA",
+            "motivo": "OK",
+            "archivo_html": str(salida_final.resolve()),
+        }
+        if datos_extra:
+            resultado["datos_extraidos"] = datos_extra
+        return resultado
+
+    finally:
             logger.info("Cerrando contexto y navegador...")
             context.close()
-            browser.close()
+            pw.stop()
             logger.info("Navegador cerrado.")
 
 

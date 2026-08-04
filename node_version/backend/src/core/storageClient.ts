@@ -28,7 +28,8 @@ export async function store(file: { filename: string; mimetype: string; size: nu
     const txt = await r.body.text();
     throw new Error(`botstorage store HTTP ${r.statusCode}: ${txt}`);
   }
-  return (await r.body.json()) as { key: string; size: number; mime: string };
+  const j = (await r.body.json()) as { success: boolean; data: { key: string; size: number; mime: string } };
+  return j.data;
 }
 
 /**

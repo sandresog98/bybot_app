@@ -3,6 +3,7 @@ import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
 import { randomBytes } from 'node:crypto';
 import { prisma } from './db.js';
 import { env } from '../config/env.js';
+import { modulesFor } from './roles.js';
 
 const secret = new TextEncoder().encode(env.BACKEND_JWT_SECRET);
 
@@ -17,7 +18,7 @@ export interface AccessTokenPayload extends JWTPayload {
 export interface LoginResult {
   ok: boolean;
   error?: string;
-  user?: { id: number; usuario: string; rol: string; nombre: string; clave_un_solo_uso: boolean };
+  user?: { id: number; usuario: string; rol: string; nombre: string; clave_un_solo_uso: boolean; modulos: string[] };
   access?: string;
   refresh?: string;
 }
@@ -31,7 +32,7 @@ export async function attemptLogin(usuario: string, password: string, ip?: strin
   if (!ok) return { ok: false, error: 'Usuario o contraseña incorrectos.' };
 
   // Generar tokens
-  const modulos = (await import('./roles.js')).modulesFor(u.rol);
+  const modulos = modulesFor(u.rol);
   const access = await new SignJWT({ usuario: u.usuario, rol: u.rol, nombre: u.nombre_completo, modulos })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(String(u.id))
@@ -59,7 +60,7 @@ export async function attemptLogin(usuario: string, password: string, ip?: strin
 
   return {
     ok: true,
-    user: { id: u.id, usuario: u.usuario, rol: u.rol, nombre: u.nombre_completo, clave_un_solo_uso: u.clave_un_solo_uso === 1 },
+    user: { id: u.id, usuario: u.usuario, rol: u.rol, nombre: u.nombre_completo, clave_un_solo_uso: u.clave_un_solo_uso === 1, modulos },
     access,
     refresh: refreshToken, // se envía al cliente en claro; BD guarda el hash
   };
@@ -94,7 +95,7 @@ export async function rotateRefresh(refreshToken: string): Promise<LoginResult> 
   const u = await prisma.controlUsuario.findUnique({ where: { id: matched.usuario_id } });
   if (!u) return { ok: false, error: 'Usuario inexistente.' };
 
-  const modulos = (await import('./roles.js')).modulesFor(u.rol);
+  const modulos = modulesFor(u.rol);
   const access = await new SignJWT({ usuario: u.usuario, rol: u.rol, nombre: u.nombre_completo, modulos })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(String(u.id))
@@ -115,7 +116,7 @@ export async function rotateRefresh(refreshToken: string): Promise<LoginResult> 
 
   return {
     ok: true,
-    user: { id: u.id, usuario: u.usuario, rol: u.rol, nombre: u.nombre_completo, clave_un_solo_uso: u.clave_un_solo_uso === 1 },
+    user: { id: u.id, usuario: u.usuario, rol: u.rol, nombre: u.nombre_completo, clave_un_solo_uso: u.clave_un_solo_uso === 1, modulos },
     access,
     refresh: newRefresh,
   };

@@ -189,6 +189,7 @@ model Proceso {
   datos_ia        ProcesosDatosIa[]
   historial       ProcesosHistorial[]
   colas_trabajos  AppColasTrabajo[]
+  consultas       ProcesosConsulta[]
 
   @@index([codigo], name: "idx_proc_codigo")
   @@index([estado], name: "idx_proc_estado")
@@ -264,4 +265,100 @@ model ProcesosHistorial {
   @@index([accion], name: "idx_hist_accion")
   @@index([fecha], name: "idx_hist_fecha")
   @@map("procesos_historial")
+}
+
+// ============= F3: consultas de bots =============
+
+model ProcesosConsulta {
+  id               Int       @id @default(autoincrement())
+  proceso_id       Int
+  persona_tipo     String    @db.VarChar(20)
+  bot              String    @db.VarChar(50)
+  numero_id        String    @db.VarChar(50)
+  consulta_tabla   String?   @db.VarChar(50)
+  consulta_id      Int?
+  estado           String    @default("pendiente") @db.VarChar(20)
+  resultado_resumen Json?
+  orden_ejecucion  Int       @default(0)
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @default(now()) @updatedAt
+
+  proceso Proceso @relation(fields: [proceso_id], references: [id], onDelete: Cascade)
+
+  @@index([proceso_id], name: "idx_pc_proceso")
+  @@index([estado], name: "idx_pc_estado")
+  @@map("procesos_consultas")
+}
+
+// Bot consultation tables (read-only mirror of Python-managed tables)
+model FosigaConsulta {
+  id                      Int      @id @default(autoincrement())
+  numero_id               String   @db.VarChar(50)
+  tipo_identificacion     String?  @db.VarChar(20)
+  nombres                 String?  @db.VarChar(255)
+  apellidos               String?  @db.VarChar(255)
+  fecha_nacimiento        String?  @db.VarChar(20)
+  departamento            String?  @db.VarChar(100)
+  municipio               String?  @db.VarChar(100)
+  estado                  String?  @db.VarChar(100)
+  entidad                 String?  @db.VarChar(255)
+  regimen                 String?  @db.VarChar(100)
+  fecha_afiliacion_efectiva String? @db.VarChar(50)
+  fecha_finalizacion_afiliacion String? @db.VarChar(50)
+  tipo_afiliado           String?  @db.VarChar(100)
+  motivo                  String?  @db.Text
+  archivo_original        String?  @db.VarChar(500)
+  metadata_json           Json?
+  fecha_consulta          DateTime? @db.DateTime
+  created_at              DateTime @default(now())
+  updated_at              DateTime @default(now()) @updatedAt
+
+  @@index([numero_id], name: "idx_fos_numero")
+  @@map("fosiga_consultas")
+}
+
+model RuafConsulta {
+  id                 Int      @id @default(autoincrement())
+  numero_id          String   @db.VarChar(50)
+  tipo_doc           String?  @db.VarChar(20)
+  eps_afiliado       String?  @db.VarChar(255)
+  regimen            String?  @db.VarChar(100)
+  estado_afiliacion  String?  @db.VarChar(100)
+  fecha_afiliacion_eps String? @db.VarChar(50)
+  novedad            String?  @db.Text
+  motivo             String?  @db.Text
+  archivo_original   String?  @db.VarChar(500)
+  metadata_json      Json?
+  fecha_consulta     DateTime? @db.DateTime
+  created_at         DateTime @default(now())
+  updated_at         DateTime @default(now()) @updatedAt
+
+  @@index([numero_id], name: "idx_ruaf_numero")
+  @@map("ruaf_consultas")
+}
+
+model RuesConsulta {
+  id                Int      @id @default(autoincrement())
+  numero_id         String   @db.VarChar(50)
+  identificacion    String?  @db.VarChar(100)
+  razon_social      String?  @db.VarChar(255)
+  nit               String?  @db.VarChar(50)
+  numero_inscripcion String? @db.VarChar(50)
+  categoria         String?  @db.VarChar(100)
+  camara_comercio   String?  @db.VarChar(255)
+  matricula_mercantil String? @db.VarChar(100)
+  estado_matricula  String?  @db.VarChar(100)
+  direccion         String?  @db.VarChar(255)
+  departamento      String?  @db.VarChar(100)
+  municipio         String?  @db.VarChar(100)
+  fecha_renovacion  String?  @db.VarChar(50)
+  motivo            String?  @db.Text
+  archivo_original  String?  @db.VarChar(500)
+  metadata_json     Json?
+  fecha_consulta    DateTime? @db.DateTime
+  created_at        DateTime @default(now())
+  updated_at        DateTime @default(now()) @updatedAt
+
+  @@index([numero_id], name: "idx_rues_numero")
+  @@map("rues_consultas")
 }

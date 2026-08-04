@@ -9,6 +9,7 @@ import argparse
 import logging
 import sys
 import time
+import unicodedata
 from datetime import datetime, timedelta, timezone, tzinfo
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -17,10 +18,10 @@ from playwright.sync_api import (
     Frame,
     Locator,
     Page,
-    sync_playwright,
     TimeoutError as PlaywrightTimeoutError,
 )
 
+from common.browser import crear_contexto_persistente
 from common.logging_config import configurar_logging, silenciar_logs_ruidosos
 from common.storage import registrar_consulta
 from common.timezone_utils import periodo_mes_anterior
@@ -66,10 +67,14 @@ CHROME_WA = (
 )
 
 
+def _normalizar(texto: str) -> str:
+    n = unicodedata.normalize("NFKD", texto)
+    return "".join(c for c in n if not unicodedata.combining(c))
+
 def _hay_sin_pagos_ultimos_6_meses(texto_pagina: str) -> bool:
     if not texto_pagina:
         return False
-    n = " ".join(texto_pagina.lower().split())
+    n = _normalizar(" ".join(texto_pagina.lower().split()))
     if _FRASE_SIN_PAGOS in n:
         return True
     if "no hay pagos realizados" in n and ("ultimos 6 meses" in n or "ultimos 6 meses" in n):
@@ -227,106 +232,102 @@ def ejecutar_consulta(
         headless, out_final, mes, anio, numero_documento,
     )
 
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=headless)
-        context = browser.new_context(
-            viewport={"width": 1280, "height": 900},
-            locale="es-CO",
-            timezone_id="America/Bogota",
-            accept_downloads=True,
-            user_agent=CHROME_WA,
-            extra_http_headers={"Accept-Language": "es-CO,es;q=0.9,en;q=0.5"},
+    pw, context = crear_contexto_persistente(
+        headless=headless,
+        user_agent=CHROME_WA,
+        extra_http_headers={"Accept-Language": "es-CO,es;q=0.9,en;q=0.5"},
+        accept_downloads=True,
+        default_timeout=120000,
+    )
+    page = context.new_page()
+    p_work: Page = page
+
+    try:
+        logger.info("Abriendo URL de consulta directa")
+        p_work.goto(DEFAULT_URL, wait_until="load", timeout=120000)
+        _esperar_cargando_suave(p_work)
+
+        doc_sup, doc_loc = localizar_campo_numero_doc(p_work, max_espera_s=120.0)
+        doc_loc.scroll_into_view_if_needed()
+        doc_loc.fill(numero_documento, timeout=120000)
+        logger.info("Documento escrito (selector flexible JSF/iframe)")
+
+        p_work = abrir_pagina_tras_consultar_inicial(doc_sup)
+        _esperar_cargando_suave(p_work)
+
+        texto_ini = (p_work.locator("body").inner_text() or "")
+        if not _hay_sin_pagos_ultimos_6_meses(texto_ini):
+            time.sleep(0.85)
+            texto_ini = (p_work.locator("body").inner_text() or "")
+        if _hay_sin_pagos_ultimos_6_meses(texto_ini):
+            return _resultado_sin_pagos_portal(err_base)
+
+        if _hay_error_seguridad(texto_ini):
+            return _resultado_error_seguridad(err_base)
+
+        if _es_pagina_preguntas_seguridad(p_work):
+            return _resultado_preguntas_seguridad(err_base)
+
+        p_sup = clic_radio_periodo_cotizacion(p_work)
+        abrir_panel_calendario_periodo(p_sup)
+        seleccionar_mes_anio(
+            p_sup,
+            id_mes="periodoCotizacion:mes",
+            id_anio="periodoCotizacion:anio",
+            mes=mes,
+            anio=anio,
         )
-        page = context.new_page()
-        page.set_default_timeout(120000)
-        p_work: Page = page
+        clic_aceptar_periodo_restringido(p_sup)
+        clic_consultar(p_sup)
+        try:
+            p_work.wait_for_load_state("load", timeout=120000)
+        except PlaywrightTimeoutError:
+            logger.warning("Tras 2.o consultar, load timeout; comprobando tabla...")
 
         try:
-            logger.info("Abriendo URL de consulta directa")
-            p_work.goto(DEFAULT_URL, wait_until="load", timeout=120000)
-            _esperar_cargando_suave(p_work)
+            p_sup.locator("table#cuadro1").first.wait_for(state="visible", timeout=8000)
+            logger.info("Tabla #cuadro1 visible (opcional)")
+        except PlaywrightTimeoutError:
+            logger.info("No aparecio table#cuadro1 a tiempo; se ignora y se busca el boton PDF.")
 
-            doc_sup, doc_loc = localizar_campo_numero_doc(p_work, max_espera_s=120.0)
-            doc_loc.scroll_into_view_if_needed()
-            doc_loc.fill(numero_documento, timeout=120000)
-            logger.info("Documento escrito (selector flexible JSF/iframe)")
-
-            p_work = abrir_pagina_tras_consultar_inicial(doc_sup)
-            _esperar_cargando_suave(p_work)
-
-            texto_ini = (p_work.locator("body").inner_text() or "")
-            if not _hay_sin_pagos_ultimos_6_meses(texto_ini):
-                time.sleep(0.85)
-                texto_ini = (p_work.locator("body").inner_text() or "")
-            if _hay_sin_pagos_ultimos_6_meses(texto_ini):
-                return _resultado_sin_pagos_portal(err_base)
-
-            if _hay_error_seguridad(texto_ini):
-                return _resultado_error_seguridad(err_base)
-
-            if _es_pagina_preguntas_seguridad(p_work):
-                return _resultado_preguntas_seguridad(err_base)
-
-            p_sup = clic_radio_periodo_cotizacion(p_work)
-            abrir_panel_calendario_periodo(p_sup)
-            seleccionar_mes_anio(
-                p_sup,
-                id_mes="periodoCotizacion:mes",
-                id_anio="periodoCotizacion:anio",
-                mes=mes,
-                anio=anio,
-            )
-            clic_aceptar_periodo_restringido(p_sup)
-            clic_consultar(p_sup)
-            try:
-                p_work.wait_for_load_state("load", timeout=120000)
-            except PlaywrightTimeoutError:
-                logger.warning("Tras 2.o consultar, load timeout; comprobando tabla...")
-
-            try:
-                p_sup.locator("table#cuadro1").first.wait_for(state="visible", timeout=8000)
-                logger.info("Tabla #cuadro1 visible (opcional)")
-            except PlaywrightTimeoutError:
-                logger.info("No aparecio table#cuadro1 a tiempo; se ignora y se busca el boton PDF.")
-
-            preparar_tabla_cuadro_antes_pdf(p_sup)
-            encontrado = esperar_boton_pdf(p_sup, max_espera_s=120.0)
-            if encontrado is None:
-                texto = p_work.locator("body").inner_text() or ""
-                texto_corto = texto[:800]
-                return {
-                    **err_base,
-                    "estado": "ERROR_SIN_BOTON",
-                    "motivo": (
-                        "No se encontro el boton PDF (pdfLogo / listaPlanillasPagadas en pagina/iframes). "
-                        f"Texto aprox: {texto_corto!r}"
-                    ),
-                    "archivo_pdf": "",
-                }
-
-            sup_pdf, btn_pdf = encontrado
-            ejecutar_descarga_pdf_a_archivo(sup_pdf, btn_pdf, out_final)
-            ruta = str(out_final.resolve())
-            logger.info("PDF guardado: %s", ruta)
+        preparar_tabla_cuadro_antes_pdf(p_sup)
+        encontrado = esperar_boton_pdf(p_sup, max_espera_s=120.0)
+        if encontrado is None:
+            texto = p_work.locator("body").inner_text() or ""
+            texto_corto = texto[:800]
             return {
                 **err_base,
-                "estado": "EXITOSA",
-                "motivo": "OK",
-                "archivo_pdf": ruta,
-            }
-
-        except Exception as e:
-            logger.exception("Error en el flujo Simple.co: %s", e)
-            return {
-                **err_base,
-                "estado": "ERROR",
-                "motivo": str(e),
+                "estado": "ERROR_SIN_BOTON",
+                "motivo": (
+                    "No se encontro el boton PDF (pdfLogo / listaPlanillasPagadas en pagina/iframes). "
+                    f"Texto aprox: {texto_corto!r}"
+                )[:480],
                 "archivo_pdf": "",
             }
-        finally:
-            context.close()
-            browser.close()
-            logger.info("Navegador cerrado.")
+
+        sup_pdf, btn_pdf = encontrado
+        ejecutar_descarga_pdf_a_archivo(sup_pdf, btn_pdf, out_final)
+        ruta = str(out_final.resolve())
+        logger.info("PDF guardado: %s", ruta)
+        return {
+            **err_base,
+            "estado": "EXITOSA",
+            "motivo": "OK",
+            "archivo_pdf": ruta,
+        }
+
+    except Exception as e:
+        logger.exception("Error en el flujo Simple.co: %s", e)
+        return {
+            **err_base,
+            "estado": "ERROR",
+            "motivo": str(e)[:480],
+            "archivo_pdf": "",
+        }
+    finally:
+        context.close()
+        pw.stop()
+        logger.info("Navegador cerrado.")
 
 
 def main() -> None:

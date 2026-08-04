@@ -9,6 +9,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './styles/variables.css';
 import './styles/common.css';
+import './styles/modals.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {

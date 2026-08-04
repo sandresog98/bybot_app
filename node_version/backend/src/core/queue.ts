@@ -43,3 +43,32 @@ export async function getStatus(jobId: string) {
     },
   });
 }
+
+/** Marca un trabajo como completado **/
+export async function markComplete(jobId: string, resultado: Record<string, unknown>) {
+  await prisma.appColasTrabajo.update({
+    where: { job_id: jobId },
+    data: {
+      estado: 'completado',
+      resultado: resultado as never,
+      finished_at: new Date(),
+    },
+  });
+}
+
+/** Marca un trabajo como fallido (o lo devuelve a pendiente si quedan intentos). **/
+export async function markFailed(jobId: string, error: string) {
+  const job = await prisma.appColasTrabajo.findFirst({ where: { job_id: jobId } });
+  if (!job) return;
+  const nuevosIntentos = job.intentos + 1;
+  const nuevoEstado = nuevosIntentos >= job.max_intentos ? 'fallido' : 'pendiente';
+  await prisma.appColasTrabajo.update({
+    where: { job_id: jobId },
+    data: {
+      estado: nuevoEstado,
+      error_mensaje: error,
+      intentos: nuevosIntentos,
+      finished_at: new Date(),
+    },
+  });
+}

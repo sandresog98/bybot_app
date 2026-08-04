@@ -9,12 +9,13 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from playwright.sync_api import Frame, Page, sync_playwright
+from playwright.sync_api import Frame, Page
 
+from common.browser import crear_contexto_persistente
 from common.logging_config import configurar_logging, silenciar_logs_ruidosos
 from common.storage import registrar_consulta
 from common.timezone_utils import ZONA_BOGOTA
-from common.stealth import aplicar_stealth, CHROME_UA_LINUX
+from common.stealth import CHROME_UA_LINUX
 
 logger = logging.getLogger(__name__)
 
@@ -343,108 +344,94 @@ def ejecutar_consulta(
     out = output_dir or SALIDAS_DIR
     mes_hasta_valor = _mes_anterior_valor()
 
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch(
-            headless=headless,
-            args=[
-                "--disable-blink-features=AutomationControlled",
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-infobars",
-            ],
+    pw, context = crear_contexto_persistente(
+        headless=headless,
+        user_agent=CHROME_UA_LINUX,
+        extra_http_headers={"Accept-Language": "es-CO,es;q=0.9,en;q=0.5"},
+        accept_downloads=True,
+        default_timeout=30000,
+    )
+    page = context.new_page()
+
+    try:
+        page.goto(URL_CERTIFICADOS, wait_until="domcontentloaded", timeout=60000)
+        page.get_by_role("heading", name="Certificado de aportes").first.wait_for(
+            state="visible", timeout=30000
         )
-        context = browser.new_context(
-            viewport={"width": 1366, "height": 900},
-            locale="es-CO",
-            timezone_id="America/Bogota",
-            user_agent=CHROME_UA_LINUX,
-            extra_http_headers={"Accept-Language": "es-CO,es;q=0.9,en;q=0.5"},
-            accept_downloads=True,
-        )
-        aplicar_stealth(context)
+        _scroll_visual(page, modo_lento=modo_lento)
 
-        page = context.new_page()
-        page.set_default_timeout(30000)
-
-        try:
-            page.goto(URL_CERTIFICADOS, wait_until="domcontentloaded", timeout=60000)
-            page.get_by_role("heading", name="Certificado de aportes").first.wait_for(
-                state="visible", timeout=30000
-            )
-            _scroll_visual(page, modo_lento=modo_lento)
-
-            campo_num = page.locator("#contenido_tbNumeroIdentificacion").first
-            campo_num.wait_for(state="visible", timeout=30000)
-            _tipo_lento(campo_num, numero_id, modo_lento=modo_lento)
-            _pausa(modo_lento, 0.8)
-            if campo_num.input_value().strip() != numero_id:
-                return {
-                    "estado": "ERROR",
-                    "motivo": f"No se pudo diligenciar el numero de documento. Leido: {campo_num.input_value()!r}",
-                    "archivo_pdf": "",
-                }
-
-            campo_fecha = page.locator("#contenido_txtFechaExp").first
-            campo_fecha.wait_for(state="visible", timeout=30000)
-            _tipo_lento(campo_fecha, fecha_expedicion, modo_lento=modo_lento)
-            campo_fecha.press("Tab")
-            _pausa(modo_lento, 0.8)
-            if fecha_expedicion not in campo_fecha.input_value():
-                return {
-                    "estado": "ERROR",
-                    "motivo": f"No se pudo diligenciar la fecha de expedicion. Leido: {campo_fecha.input_value()!r}",
-                    "archivo_pdf": "",
-                }
-
-            if not _seleccionar_eps(page, eps=eps, modo_lento=modo_lento):
-                return {
-                    "estado": "ERROR",
-                    "motivo": f"No se pudo seleccionar EPS: {eps}",
-                    "archivo_pdf": "",
-                }
-            _pausa(modo_lento, 0.6)
-
-            mes_desde = page.locator("#contenido_ddlMesIni").first
-            mes_desde.wait_for(state="visible", timeout=30000)
-            mes_desde.select_option(value=MES_DESDE_DEFAULT)
-            _pausa(modo_lento, 0.6)
-
-            mes_hasta = page.locator("#contenido_ddlMesFin").first
-            mes_hasta.wait_for(state="visible", timeout=30000)
-            mes_hasta.select_option(value=mes_hasta_valor)
-            _pausa(modo_lento, 0.6)
-
-            logger.info("Intentando resolver reCAPTCHA...")
-            if not _resolver_recaptcha(page, captcha_interactivo=captcha_interactivo):
-                return {
-                    "estado": "ERROR_CAPTCHA",
-                    "motivo": "No fue posible validar el reCAPTCHA.",
-                    "archivo_pdf": "",
-                }
-            logger.info("reCAPTCHA superado.")
-            _pausa(modo_lento, 0.6)
-
-            archivo_pdf = _clic_generar_y_esperar_descarga(page, numero_id=numero_id, output_dir=out)
-            logger.info("PDF guardado: %s", archivo_pdf)
-
-            if keep_open_after_fill and not headless:
-                logger.info("Navegador abierto. Presiona ENTER para cerrarlo...")
-                input("Presiona ENTER para cerrar el navegador... ")
-
-            return {
-                "estado": "EXITOSA",
-                "motivo": "OK",
-                "archivo_pdf": archivo_pdf,
-            }
-
-        except Exception as e:
-            logger.exception("Error en flujo Aportes en Linea: %s", e)
+        campo_num = page.locator("#contenido_tbNumeroIdentificacion").first
+        campo_num.wait_for(state="visible", timeout=30000)
+        _tipo_lento(campo_num, numero_id, modo_lento=modo_lento)
+        _pausa(modo_lento, 0.8)
+        if campo_num.input_value().strip() != numero_id:
             return {
                 "estado": "ERROR",
-                "motivo": str(e),
+                "motivo": f"No se pudo diligenciar el numero de documento. Leido: {campo_num.input_value()!r}",
                 "archivo_pdf": "",
             }
-        finally:
-            context.close()
-            browser.close()
-            logger.info("Navegador cerrado.")
+
+        campo_fecha = page.locator("#contenido_txtFechaExp").first
+        campo_fecha.wait_for(state="visible", timeout=30000)
+        _tipo_lento(campo_fecha, fecha_expedicion, modo_lento=modo_lento)
+        campo_fecha.press("Tab")
+        _pausa(modo_lento, 0.8)
+        if fecha_expedicion not in campo_fecha.input_value():
+            return {
+                "estado": "ERROR",
+                "motivo": f"No se pudo diligenciar la fecha de expedicion. Leido: {campo_fecha.input_value()!r}",
+                "archivo_pdf": "",
+            }
+
+        if not _seleccionar_eps(page, eps=eps, modo_lento=modo_lento):
+            return {
+                "estado": "ERROR",
+                "motivo": f"No se pudo seleccionar EPS: {eps}",
+                "archivo_pdf": "",
+            }
+        _pausa(modo_lento, 0.6)
+
+        mes_desde = page.locator("#contenido_ddlMesIni").first
+        mes_desde.wait_for(state="visible", timeout=30000)
+        mes_desde.select_option(value=MES_DESDE_DEFAULT)
+        _pausa(modo_lento, 0.6)
+
+        mes_hasta = page.locator("#contenido_ddlMesFin").first
+        mes_hasta.wait_for(state="visible", timeout=30000)
+        mes_hasta.select_option(value=mes_hasta_valor)
+        _pausa(modo_lento, 0.6)
+
+        logger.info("Intentando resolver reCAPTCHA...")
+        if not _resolver_recaptcha(page, captcha_interactivo=captcha_interactivo):
+            return {
+                "estado": "ERROR_CAPTCHA",
+                "motivo": "No fue posible validar el reCAPTCHA.",
+                "archivo_pdf": "",
+            }
+        logger.info("reCAPTCHA superado.")
+        _pausa(modo_lento, 0.6)
+
+        archivo_pdf = _clic_generar_y_esperar_descarga(page, numero_id=numero_id, output_dir=out)
+        logger.info("PDF guardado: %s", archivo_pdf)
+
+        if keep_open_after_fill and not headless:
+            logger.info("Navegador abierto. Presiona ENTER para cerrarlo...")
+            input("Presiona ENTER para cerrar el navegador... ")
+
+        return {
+            "estado": "EXITOSA",
+            "motivo": "OK",
+            "archivo_pdf": archivo_pdf,
+        }
+
+    except Exception as e:
+        logger.exception("Error en flujo Aportes en Linea: %s", e)
+        return {
+            "estado": "ERROR",
+            "motivo": str(e),
+            "archivo_pdf": "",
+        }
+    finally:
+        context.close()
+        pw.stop()
+        logger.info("Navegador cerrado.")

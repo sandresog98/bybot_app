@@ -2,7 +2,7 @@
 
 > Documento maestro de planificación. Vivo: actualizar conforme se tomen decisiones.
 >
-> Fecha creación: 2026-07-06 · Última revisión: 2026-07-09 (stack Node.js)
+> Fecha creación: 2026-07-06 · Última revisión: 2026-07-14 (F2a/F2b)
 > Proyecto raíz: `/opt/lampp/htdocs/projects/bybot_v1/node_version/`
 > Referencia legacy: `php_version/` (PHP 8.2 + worker Python — archivado, referencia)
 > Referencia más legacy: `/opt/lampp/htdocs/projects/byb/bybot_app/` (PHP + n8n + Python, no probado)
@@ -295,15 +295,90 @@ Objetivo: módulo **procesos** permite crear procesos y subir archivos.
 
 ### Fase 2 — Análisis con IA (semana 3)
 
-Objetivo: extraer datos estructurados por proceso, validables por el operador.
-- [ ] `botworker/analizador.py`: migrar `bybot_app/n8n/scripts/analyzer/gemini_client.py` + `main.py` + `shared/` (sin n8n, sin callback HTTP; escribe directo a BD).
-- [ ] `backend/core/pythonInvoker.ts` invoca `analizador.py --proceso_id X` y parsea JSON stdout.
-- [ ] Tabla `app_prompts` + editor en `pages/Prompts.tsx` con versionado y activación.
-- [ ] Backend `modules/analisis/`: POST `/procesos/:id/analizar` → encola trabajo → poll de estado → GET devuelve datos extraídos.
-- [ ] Pantalla de **validación**: campos editables lado a lado (original IA vs. validado), marca qué datos quedan aprobados.
-- [ ] Guardado de `procesos_datos_ia.datos_originales` (IA) y `datos_validados` (humano), con `version`.
-- [ ] Manejo de reintentos (máx. `app_configuracion.max_intentos_analisis`), timeouts y errores visibles.
-- [ ] **Verificación F2**: con 1 proceso real (estado de cuenta + anexos) → análisis exitoso → datos editados → estado `validado`.
+Objetivo: dado un proceso con archivos cargados, extraer datos estructurados con Gemini y permitir al operador validarlos. Dividida en 2 subfases.
+
+#### Decisiones de F2 (2026-07-14)
+- **Proveedor IA**: Google Gemini (API key vigente en `.env`).
+- **Daemon**: Python puro — `botworker/daemon.py` hace polling de `app_colas_trabajos` y ejecuta `analizador` en el mismo runtime.
+- **Trigger**: un botón "Analizar proceso" procesa TODOS los archivos visibles del proceso; el `analizador` interno decide qué prompt aplicar según `tipo` de cada archivo.
+- **Modo**: **asíncrono** — backend encola trabajo, daemon Python procesa, frontend hace poll de estado cada 3s.
+- **Editor de prompts**: modal al hacer clic en una fila (no vista dividida).
+- **Validación**: formulario por secciones (acordeones Estado de cuenta / Deudor / Codeudor / Referencias).
+
+#### F2a — Analizador + endpoint + daemon + botón Analizar
+
+**1. `botworker/` (Python, migración del legado)**
+- `analizador.py` — CLI `--proceso_id N`:
+  1. Lee `procesos_archivos` de la BD (mysql-connector-python) y `app_prompts` activos.
+  2. Abre archivos desde `uploads/` por `ruta_storage`.
+  3. Sube cada archivo a Gemini File API (`genai.upload_file`), obtiene respuesta JSON con el prompt activo correspondiente según `tipo` (estado_cuenta → prompt estado_cuenta; anexos/solicitudes → prompt anexos).
+  4. Consolida respuestas en un objeto: `{ estado_cuenta, deudor, codeudor, referencias, solicitudes_vinculacion, metadata }`.
+  5. Escribe `procesos_datos_ia` con `datos_originales`, `modelo`, `tokens_total`, `metadata`.
+  6. Cambia `procesos.estado` a `analizado` + `procesos_historial` accion `analizado`.
+  7. Print stdout `{ success, datos_ia_id, tokens_total }`.
+- `shared/config.py` — lee vars del `.env` raíz (`GEMINI_*`, `DB_*`).
+- `shared/utils.py` — conexión MySQL, helpers.
+- `daemon.py` — polling cada `cola_poll_interval_seg` (de `app_configuracion`):
+  - `SELECT ... LIMIT 1 FOR UPDATE SKIP LOCKED` (MariaDB 10.4+) → UPDATE `estado='procesando'`.
+  - Ejecuta `analizador` por import directo (mismo proceso Python) o subprocess.
+  - Escribe `resultado` + marca `completado` + `duracion_ms`.
+  - Si fallo: incrementa `intentos`, marca `fallido` con `error_mensaje`; si `intentos >= max_intentos`, queda `fallido`.
+- `requirements.txt` — `google-generativeai`, `mysql-connector-python`, `python-dotenv`.
+
+**2. `backend/src/modules/analisis/`** — ampliar stub actual**
+- `analisis.schema.ts` — zod para payload del trabajo.
+- `analisis.service.ts`:
+  - `encolarAnalisis(procesoId, usuarioId)` → inserta en `app_colas_trabajos` + cambia `procesos.estado` a `en_analisis` + historial.
+  - `getEstadoTrabajo(procesoId)` → estado del último trabajo en cola.
+  - `getResultados(procesoId)` → último `procesos_datos_ia` del proceso.
+- `analisis.routes.ts`:
+  - `POST /procesos/:id/analizar` — encola trabajo. Auth + módulo `procesos`.
+  - `GET /procesos/:id/analisis/estado` — estado (polling).
+  - `GET /procesos/:id/analisis/datos` — datos extraídos.
+
+**3. `backend/src/core/queue.ts`** — ampliar con `claimNext(cola, workerId)` atómico (UPDATE...LIMIT 1), `markComplete(jobId, resultado)`, `markFailed(jobId, error)`.
+
+**4. Frontend `ProcesoDetalle.tsx`**:
+- Botón "Analizar proceso" en el header (visible si `estado` entre `archivos_cargados` y `validado`).
+- Click → POST `/procesos/:id/analizar` → toast "Análisis encolado".
+- Polling cada 3s a `/procesos/:id/analisis/estado` mientras `pendiente|procesando`. Si `completado`, alerta + link a Analisis.tsx. Si `fallido`, mostrar error + botón "Reintentar".
+
+**5. Verificación F2a**:
+1. Subir un PDF de estado de cuenta + 1 anexo a un proceso.
+2. Click "Analizar proceso" → estado `en_analisis`.
+3. Poll muestra "Procesando…".
+4. A los ~10-30s el daemon completa → estado `analizado`.
+5. `GET /procesos/:id/analisis/datos` retorna el JSON extraído.
+6. En BD hay fila en `procesos_datos_ia`.
+7. Reintento con un PDF inválido → `fallido` → botón "Reintentar".
+
+#### F2b — Editor de prompts + Pantalla de validación (semana 2)
+
+**1. `backend/src/modules/prompts/`** — ampliar stub actual:
+- `prompts.schema.ts` — zod create/update.
+- `prompts.service.ts::list(), getById(id), create(data, usuarioId), update(id, data, usuarioId), activate(id)`.
+- `prompts.routes.ts::GET / POST / GET :id / PATCH :id / POST :id/activar` (todas admin).
+
+**2. `backend/src/modules/analisis/`** — añadir:
+- `analisis.service.ts::guardarValidacion(procesoId, datosValidados, usuarioId)` — actualiza `datos_validados`, estado `validado`, `fecha_validacion` + historial.
+- `analisis.routes.ts::PATCH /procesos/:id/validar` con `datos_validados`. Solo admin/supervisor.
+
+**3. Frontend `pages/Prompts.tsx`** — reemplazo completo:
+- Lista con nombre/versión/activo. Click en fila abre `<Modal>` con contenido + editor (textarea grande).
+- Botón "Nuevo prompt" → `<Modal>` vacío. Botón "Activar" por fila.
+
+**4. Frontend `pages/Analisis.tsx`** — nueva pantalla de validación:
+- Llama `GET /procesos/:id/analisis/datos`.
+- Formulario por secciones dentro de `<accordion>`: Estado de cuenta / Deudor / Codeudor / Referencias.
+- Cada campo etiqueta + input editable, valor por defecto = `datos_originales.X`.
+- Botón "Guardar validación" → PATCH `/procesos/:id/validar`. Toast + volver al detalle del proceso.
+
+**5. Verificación F2b**:
+1. `Prompts.tsx` — crear/editar/activar un prompt → BD actualizada.
+2. Tomar un proceso `analizado` → Abrir "Análisis" → ver los campos extraídos por la IA.
+3. Editar 2-3 campos → "Guardar validación".
+4. En BD: `procesos_datos_ia.datos_validados` actualizado, `procesos.estado = validado`.
+5. Verificar en el listado que el proceso aparece con badge `validado`.
 
 ### Fase 3 — Pulido, pruebas y deploy (semana 4)
 

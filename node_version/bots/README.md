@@ -5,19 +5,34 @@ parsers de extraccion de datos y base de datos MariaDB consolidada.
 
 > Histórico: este paquete nació como `bots2/` (migración Linux del `bots/` original
 > de Windows). El `bots/` original fue eliminado y `bots2/` renombrado a `bots/`
-> al integrarse en `node_version/`. El backend Node lo invoca via `child_process`.
+> al integrarse en `node_version/`.
+
+> **Integración actual**: el backend Node no invoca a Python por `child_process`; escribe a la
+> cola `app_colas_trabajos` (`cola='bybot:consultar'`) y `botworker/bot_runner.py` la consume,
+> resolviendo cada bot en `BOT_REGISTRY` → `bots/<name>/service.py`.
+
+## Navegador: perfil persistente (bot-detección)
+
+Todos los bots usan `common/browser.py::crear_contexto_persistente()` en vez de
+`sync_playwright` directo, para combatir bloqueos por bot-detección (reCAPTCHA invisible,
+"no se pudo validar la seguridad"). Usa `launch_persistent_context()` con perfil en
+`~/.bybot/chrome_profile`, stealth y args anti-detección. Ver `../handoff.md`.
 
 ## Estado de bots
 
 | Bot | Estado | Archivo descargado | Parser | Tiene datos de prueba |
 |-----|--------|--------------------|--------|-----------------------|
-| **ruaf** | Funcional | HTML (ReportViewer) | `parser.py` activo | 3 HTML en `bots/ruaf/salidas_ruaf/` |
-| **simpleco** | Funcional | PDF (comprobante) | `parser.py` stub | NO — requiere prueba real |
-| **fosiga** | Funcional | HTML (GridView) | `parser.py` activo | 2 HTML en `bots/fosiga/salidas_fosiga/` |
-| **rues** | Funcional | HTML (Angular SPA) | `parser.py` activo | 3 HTML en `bots/rues/salidas_rues/` |
+| **ruaf** | Funcional (servidor SISPRO inestable) | HTML (ReportViewer) | `parser.py` activo | 3 HTML en `bots/ruaf/salidas_ruaf/` |
+| **simpleco** | Funcional ✅ probado | PDF (comprobante) | `parser.py` stub | 2 PDF en `bots/suaporte/` |
+| **fosiga** | Funcional (bloqueado por reCAPTCHA) | HTML (GridView) | `parser.py` activo | 2 HTML en `bots/fosiga/salidas_fosiga/` |
+| **rues** | Funcional (timeout en headless) | HTML (Angular SPA) | `parser.py` activo | 3 HTML en `bots/rues/salidas_rues/` |
 | **suaporte** | Funcional | PDF (comprobante) | `parser.py` stub | 2 PDF en `bots/suaporte/salidas_suaporte/` |
-| **aportesenlinea** | Funcional | PDF (certificado) | `parser.py` stub | 1 PDF en `bots/aportesenlinea/salidas_aportesenlinea/` |
+| **aportesenlinea** | Funcional (reCAPTCHA imágenes) | PDF (certificado) | `parser.py` stub | 1 PDF en `bots/aportesenlinea/salidas_aportesenlinea/` |
 | **asopagos** | PENDIENTE | PDF (certificado) | No existe | No existe — falta `bot.py` |
+
+> Nota integración runner: `BOT_REGISTRY` (en `botworker/bot_runner.py`) tiene registrados
+> `fosiga`, `ruaf`, `rues`, `simpleco`. **SuAporte y Aportes en Línea aún NO están registrados**
+> en el runner, aunque tienen `service.py`.
 
 ## Instalacion (Linux)
 
@@ -68,6 +83,15 @@ cd /opt/lampp/htdocs/projects/bybot_v1/node_version/bots
 ./venv/bin/python -m aportesenlinea.cli --headed -v
 ```
 
+## Scripts de prueba
+```bash
+bash ruaf/test_ruaf.sh          # ruaf, headed — CC 39741702 / nac 26/08/1993
+bash simpleco/test_simpleco.sh  # simpleco, headed — CC 1022434547 y 39741702
+```
+
+> Todos los bots usan el **perfil persistente** (`~/.bybot/chrome_profile`) por defecto para
+> reducir bot-detección; no requieren `sync_playwright` manual.
+
 ## Estructura del proyecto
 
 ```
@@ -76,6 +100,10 @@ bots/
 ├── requirements.txt
 │
 ├── common/                    # Utilidades compartidas
+│   ├── browser.py             # crear_contexto_persistente() (perfil Chrome + stealth) ★
+│   ├── stealth.py             # Scripts anti-deteccion (navigator.webdriver, etc.)
+│   ├── ai.py                  # Cliente Gemini (resolver_captcha_ocr, extraer_datos_reporte)
+│   ├── captcha.py             # helpers de captcha (localizacion, renovacion)
 │   ├── logging_config.py      # configurar_logging(), silenciar_logs_ruidosos()
 │   ├── csv_writer.py          # registrar_consulta_csv() unificado
 │   ├── timezone_utils.py      # ZONA_BOGOTA, periodo_mes_anterior()

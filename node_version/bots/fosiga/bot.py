@@ -7,8 +7,9 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from playwright.sync_api import BrowserContext, Frame, Page, sync_playwright
+from playwright.sync_api import BrowserContext, Frame, Page
 
+from common.browser import crear_contexto_persistente
 from common.logging_config import configurar_logging, silenciar_logs_ruidosos
 
 logger = logging.getLogger(__name__)
@@ -187,90 +188,86 @@ def ejecutar_consulta(
     keep_open_after_step: bool = False,
 ) -> dict[str, str]:
     logger.info("Abriendo ADRES: Consulte su EPS.")
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=headless)
-        context = browser.new_context(
-            viewport={"width": 1366, "height": 900},
-            locale="es-CO",
-            timezone_id="America/Bogota",
+    pw, context = crear_contexto_persistente(
+        headless=headless,
+        default_timeout=30000,
+    )
+    page = context.new_page()
+
+    try:
+        page.goto(URL_CONSULTA_EPS, wait_until="domcontentloaded", timeout=60000)
+        page.wait_for_timeout(2500)
+        frame_formulario = _obtener_frame_formulario(page.frames)
+        logger.info("Digitando numero de identificacion: %s", numero_documento)
+        _diligenciar_numero(frame_formulario, numero_documento)
+        token = _asegurar_token_recaptcha(frame_formulario, headless=headless)
+        logger.info("Token reCAPTCHA disponible: %s", "SI" if token else "NO")
+        nueva_pestana = _clic_consultar_y_capturar_pestana(
+            frame=frame_formulario, context=context
         )
-        page = context.new_page()
-        page.set_default_timeout(30000)
+        page.wait_for_timeout(2500)
 
-        try:
-            page.goto(URL_CONSULTA_EPS, wait_until="domcontentloaded", timeout=60000)
-            page.wait_for_timeout(2500)
-            frame_formulario = _obtener_frame_formulario(page.frames)
-            logger.info("Digitando numero de identificacion: %s", numero_documento)
-            _diligenciar_numero(frame_formulario, numero_documento)
-            token = _asegurar_token_recaptcha(frame_formulario, headless=headless)
-            logger.info("Token reCAPTCHA disponible: %s", "SI" if token else "NO")
-            nueva_pestana = _clic_consultar_y_capturar_pestana(
-                frame=frame_formulario, context=context
-            )
-            page.wait_for_timeout(2500)
+        if nueva_pestana:
+            logger.info("Se detecto nueva pestana; se exporta HTML completo de esa pestana.")
+            html_resultado = nueva_pestana.content()
+            url_final = nueva_pestana.url
+        else:
+            logger.info("No se detecto nueva pestana; esperando HTML de resultado en el iframe.")
+            try:
+                html_resultado = _esperar_html_resultado_en_frame(frame_formulario)
+            except RuntimeError as exc:
+                html_actual = frame_formulario.content()
+                if headless and _es_texto_bloqueo_validacion(html_actual):
+                    return {
+                        "estado": "ERROR",
+                        "motivo": (
+                            "El portal bloqueo la consulta en modo headless por validacion/captcha "
+                            "(no se abrio la pagina de respuesta)."
+                        ),
+                        "url_final": frame_formulario.url or page.url,
+                        "archivo_html": "",
+                    }
+                raise exc
+            url_final = frame_formulario.url or page.url
 
-            if nueva_pestana:
-                logger.info("Se detecto nueva pestana; se exporta HTML completo de esa pestana.")
-                html_resultado = nueva_pestana.content()
-                url_final = nueva_pestana.url
-            else:
-                logger.info("No se detecto nueva pestana; esperando HTML de resultado en el iframe.")
-                try:
-                    html_resultado = _esperar_html_resultado_en_frame(frame_formulario)
-                except RuntimeError as exc:
-                    html_actual = frame_formulario.content()
-                    if headless and _es_texto_bloqueo_validacion(html_actual):
-                        return {
-                            "estado": "ERROR",
-                            "motivo": (
-                                "El portal bloqueo la consulta en modo headless por validacion/captcha "
-                                "(no se abrio la pagina de respuesta)."
-                            ),
-                            "url_final": frame_formulario.url or page.url,
-                            "archivo_html": "",
-                        }
-                    raise exc
-                url_final = frame_formulario.url or page.url
+        token_len = len(_leer_token_recaptcha(frame_formulario))
+        logger.info("Longitud token reCAPTCHA detectada: %s", token_len)
 
-            token_len = len(_leer_token_recaptcha(frame_formulario))
-            logger.info("Longitud token reCAPTCHA detectada: %s", token_len)
-
-            if _es_no_encontrado_bdua(html_resultado):
-                logger.info("Documento no encontrado en BDUA; se finaliza sin guardar HTML.")
-                return {
-                    "estado": "FINALIZADO",
-                    "motivo": (
-                        f"El afiliado con numero de documento {numero_documento} no se encuentra en BDUA."
-                    ),
-                    "url_final": url_final,
-                    "archivo_html": "",
-                }
-
-            salida_dir = output_dir or (FOSIGA_DATA_DIR / "salidas_fosiga")
-            archivo_html = _guardar_html_resultado(
-                html_resultado, output_dir=salida_dir, numero_documento=numero_documento
-            )
-            logger.info("HTML exportado desde: %s", url_final)
-
+        if _es_no_encontrado_bdua(html_resultado):
+            logger.info("Documento no encontrado en BDUA; se finaliza sin guardar HTML.")
             return {
-                "estado": "EXITOSA",
-                "motivo": "Paso completado: numero diligenciado, clic en Consultar y HTML exportado.",
+                "estado": "FINALIZADO",
+                "motivo": (
+                    f"El afiliado con numero de documento {numero_documento} no se encuentra en BDUA."
+                ),
                 "url_final": url_final,
-                "archivo_html": str(archivo_html),
+                "archivo_html": "",
             }
-        except Exception as e:
-            logger.error("Error en flujo FOSIGA: %s", e)
-            return {
-                "estado": "ERROR",
-                "motivo": str(e),
-                "url_final": "",
-            }
-        finally:
-            if (not headless) and keep_open_after_step:
-                try:
-                    input()
-                except EOFError:
-                    pass
-            context.close()
-            browser.close()
+
+        salida_dir = output_dir or (FOSIGA_DATA_DIR / "salidas_fosiga")
+        archivo_html = _guardar_html_resultado(
+            html_resultado, output_dir=salida_dir, numero_documento=numero_documento
+        )
+        logger.info("HTML exportado desde: %s", url_final)
+
+        return {
+            "estado": "EXITOSA",
+            "motivo": "Paso completado: numero diligenciado, clic en Consultar y HTML exportado.",
+            "url_final": url_final,
+            "archivo_html": str(archivo_html),
+        }
+    except Exception as e:
+        logger.error("Error en flujo FOSIGA: %s", e)
+        return {
+            "estado": "ERROR",
+            "motivo": str(e),
+            "url_final": "",
+        }
+    finally:
+        if (not headless) and keep_open_after_step:
+            try:
+                input()
+            except EOFError:
+                pass
+        context.close()
+        pw.stop()
