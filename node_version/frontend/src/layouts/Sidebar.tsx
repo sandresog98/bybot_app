@@ -4,6 +4,7 @@ const CATALOG: Record<string, { icon: string; label: string; path: string }> = {
   dashboard:     { icon: 'speedometer2', label: 'Dashboard',     path: '/' },
   procesos:      { icon: 'folder',       label: 'Procesos',      path: '/procesos' },
   analisis:      { icon: 'robot',        label: 'Análisis IA',    path: '/analisis' },
+  entidades:     { icon: 'building',      label: 'Entidades',     path: '/entidades' },
   prompts:       { icon: 'chat-left-text',label: 'Prompts IA',    path: '/prompts' },
   usuarios:      { icon: 'people',       label: 'Usuarios',      path: '/usuarios' },
   configuracion: { icon: 'gear',         label: 'Configuración', path: '/configuracion' },

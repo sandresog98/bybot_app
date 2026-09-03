@@ -40,6 +40,13 @@ export async function analisisRoutes(app: FastifyInstance) {
     return ok(datos);
   });
 
+  // GET /procesos/:id/analisis/consumo — tokens y costo estimado agregado del proceso
+  app.get('/procesos/:id/analisis/consumo', { preHandler: app.requireAuth }, async (req, rep) => {
+    const procesoId = Number((req.params as { id: string }).id);
+    if (!Number.isInteger(procesoId)) return rep.code(400).send(badRequest('ID inválido'));
+    return ok(await svc.getConsumoProceso(procesoId));
+  });
+
   // POST /procesos/:id/validar — validar datos IA
   app.post('/procesos/:id/validar', { preHandler: [app.requireAuth, requireEdit] }, async (req, rep) => {
     const procesoId = Number((req.params as { id: string }).id);

@@ -10,7 +10,18 @@ tabla `app_colas_trabajos` y estos procesos la consumen de forma asíncrona.
 - **`bot_runner.py`** — consultas bot. Hace `claim_next()` sobre la cola
   `'bybot:consultar'`, resuelve el bot en `BOT_REGISTRY` y ejecuta `bots/<name>/service.py`.
   Escribe en `processes`. Log: `/tmp/bybotrunner.log`.
-- **`analizador.py`** — implementación concreta del análisis IA (usado por `daemon.py`).
+- **`analizador.py`** — análisis IA (usado por `daemon.py`). **Multi-entidad (F4)**: agrupa los
+  archivos del proceso por categoría lógica, elige el prompt (específico de la entidad si existe,
+  si no el global — `utils.get_prompts_activos(conn, entidad_id)`), hace una llamada Gemini por
+  categoría y fusiona el resultado canónico. Reintenta ante 429/503 y repara JSON truncado.
+  Guarda `tokens_entrada`/`tokens_salida` (la salida incluye *thinking tokens*).
+- **`shared/documentos.py`** — normaliza formatos para Gemini: **TIFF→PDF** con Pillow
+  (con tope anti *image-bomb*); PDF/PNG/JPEG pasan tal cual.
+
+## Config IA (`.env`, leída por `shared/config.py`)
+`GEMINI_MODEL`, `GEMINI_MAX_TOKENS` (26000, evita truncar amortizaciones largas),
+`GEMINI_THINKING_BUDGET` (**0 = thinking off** para extracción; -1 = auto; >0 = fijo).
+Tras editar `analizador.py` o cambiar la key/config, **reiniciar el daemon**.
 
 ## Estado
 - Funcional. Reemplazó la Fase 0b (placeholder). El backend ya no invoca Python por
@@ -24,9 +35,9 @@ pip install -r requirements.txt
 
 ## Uso (dev / manual)
 ```bash
-cd /opt/lampp/htdocs/projects/bybot_v1/node_version/botworker
-.venv/bin/python daemon.py          # análisis IA
-.venv/bin/python bot_runner.py      # consultas bot
+# desde node_version/ (macOS no tiene setsid → usar nohup)
+nohup ./botworker/.venv/bin/python botworker/daemon.py     > /tmp/bydaemon.log    2>&1 &  # análisis IA
+nohup ./botworker/.venv/bin/python botworker/bot_runner.py > /tmp/bybotrunner.log 2>&1 &  # consultas bot
 ```
 
 ## Estructura
@@ -34,11 +45,12 @@ cd /opt/lampp/htdocs/projects/bybot_v1/node_version/botworker
 botworker/
 ├── README.md
 ├── requirements.txt
-├── analizador.py        # análisis IA Gemini por proceso_id
+├── analizador.py        # análisis IA Gemini multi-entidad por proceso_id
 ├── daemon.py            # daemon/supervisor de análisis
 ├── bot_runner.py        # consumidor de cola 'bybot:consultar' (BOT_REGISTRY)
 └── shared/
-    ├── config.py
+    ├── config.py        # variables de entorno (Gemini, DB, thinking budget)
+    ├── documentos.py    # normalización de formato (TIFF→PDF)
     └── utils.py
 ```
 

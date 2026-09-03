@@ -9,6 +9,65 @@ interface Props {
   saving: boolean;
 }
 
+// ── Formato numérico SOLO VISUAL (no altera los datos guardados) ──
+// Un valor es "numérico" si es number finito o un string de solo dígitos/decimal.
+function looksNumeric(v: unknown): boolean {
+  if (typeof v === 'number') return Number.isFinite(v);
+  if (typeof v === 'string') {
+    const t = v.trim();
+    return t !== '' && /^-?\d+([.,]\d+)?$/.test(t);
+  }
+  return false;
+}
+
+// Muestra miles con '.' y decimales con ',' (es-CO). Solo para presentación.
+function fmtNum(v: unknown): string {
+  if (!looksNumeric(v)) return v == null ? '' : String(v);
+  const n = typeof v === 'number' ? v : Number(String(v).replace(',', '.'));
+  if (!Number.isFinite(n)) return String(v);
+  return n.toLocaleString('es-CO', { maximumFractionDigits: 10 });
+}
+
+/**
+ * Input que muestra el número FORMATEADO cuando no está enfocado y el valor CRUDO
+ * al enfocarlo (para editar). Lo que se propaga en onChange es siempre el texto crudo
+ * tecleado → el dato guardado nunca contiene separadores de formato.
+ */
+function EditNum({ value, onChange, textarea = false, rows, className = 'form-control form-control-sm' }: {
+  value: unknown;
+  onChange: (v: string) => void;
+  textarea?: boolean;
+  rows?: number;
+  className?: string;
+}) {
+  const [focused, setFocused] = useState(false);
+  const raw = value == null ? '' : String(value);
+  const shown = focused || !looksNumeric(value) ? raw : fmtNum(value);
+  const handlers = {
+    className,
+    value: shown,
+    onFocus: () => setFocused(true),
+    onBlur: () => setFocused(false),
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange(e.target.value),
+  };
+  return textarea ? <textarea {...handlers} rows={rows} /> : <input {...handlers} />;
+}
+
+/** Texto de solo lectura con recorte visual ("ver más/menos") si es muy largo. */
+function CollapsibleText({ text, limit = 240 }: { text: string; limit?: number }) {
+  const [open, setOpen] = useState(false);
+  const style = { fontSize: '.9rem', whiteSpace: 'pre-wrap' as const };
+  if (text.length <= limit) return <div style={style}>{text}</div>;
+  return (
+    <div style={style}>
+      {open ? text : text.slice(0, limit).trimEnd() + '… '}
+      <button type="button" className="btn btn-link btn-sm p-0 align-baseline" onClick={() => setOpen(!open)}>
+        {open ? 'ver menos' : 'ver más'}
+      </button>
+    </div>
+  );
+}
+
 function renderField(key: string, value: unknown, onChange: (k: string, v: unknown) => void, readOnly: boolean) {
   const label = key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -22,32 +81,54 @@ function renderField(key: string, value: unknown, onChange: (k: string, v: unkno
   }
 
   if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return (
+        <div key={key} className="mb-2">
+          <label className="form-label small text-muted">{label}</label>
+          <div className="text-muted small fst-italic">Sin datos</div>
+        </div>
+      );
+    }
+    const allObjects = value.every((it) => typeof it === 'object' && it !== null && !Array.isArray(it));
+    if (allObjects) {
+      // Array de objetos → tabla (columnas = unión de claves). Ideal para amortización/referencias.
+      const cols = Array.from(new Set(value.flatMap((o) => Object.keys(o as Record<string, unknown>))));
+      return (
+        <div key={key} className="mb-2">
+          <label className="form-label small text-muted">{label} <span className="text-muted">({value.length})</span></label>
+          <div className="table-responsive" style={{ maxHeight: 320, overflow: 'auto' }}>
+            <table className="table table-sm table-bordered mb-0" style={{ fontSize: '.8rem' }}>
+              <thead className="table-light" style={{ position: 'sticky', top: 0 }}>
+                <tr>{cols.map((c) => <th key={c}>{c.replace(/_/g, ' ')}</th>)}</tr>
+              </thead>
+              <tbody>
+                {(value as Record<string, unknown>[]).map((row, i) => (
+                  <tr key={i}>
+                    {cols.map((c) => (
+                      <td key={c}>
+                        {readOnly
+                          ? <span>{fmtNum(row[c])}</span>
+                          : <EditNum className="form-control form-control-sm border-0 p-1" value={row[c]}
+                              onChange={(val) => {
+                                const next = [...(value as Record<string, unknown>[])];
+                                next[i] = { ...next[i], [c]: val };
+                                onChange(key, next);
+                              }} />}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+    // Array de primitivos
     return (
       <div key={key} className="mb-2">
         <label className="form-label small text-muted">{label}</label>
-        {value.length === 0
-          ? <div className="text-muted small fst-italic">Sin datos</div>
-          : value.map((item, i) => (
-              <div key={i} className="card card-body py-2 px-3 mb-1 bg-light" style={{ fontSize: '.85rem' }}>
-                {typeof item === 'object' && item !== null
-                  ? Object.entries(item as Record<string, unknown>).map(([k, v]) => (
-                      <div key={k} className="row mb-1">
-                        <div className="col-4 text-muted small">{k.replace(/_/g, ' ')}</div>
-                        <div className="col-8">
-                          {readOnly
-                            ? <span>{String(v ?? '')}</span>
-                            : <input className="form-control form-control-sm" value={String(v ?? '')}
-                                onChange={(e) => {
-                                  const newVal = [...value] as Record<string, unknown>[];
-                                  newVal[i] = { ...(newVal[i] as Record<string, unknown>), [k]: e.target.value };
-                                  onChange(key, newVal);
-                                }} />}
-                        </div>
-                      </div>
-                    ))
-                  : <span>{String(item)}</span>}
-              </div>
-            ))}
+        <div style={{ fontSize: '.85rem' }}>{value.map((v) => fmtNum(v)).join(', ')}</div>
       </div>
     );
   }
@@ -60,10 +141,32 @@ function renderField(key: string, value: unknown, onChange: (k: string, v: unkno
           {Object.entries(value as Record<string, unknown>).map(([k, v]) => {
             if (typeof v === 'object' && v !== null) {
               if (Array.isArray(v)) {
+                const objRows = v.filter((it) => typeof it === 'object' && it !== null && !Array.isArray(it));
+                if (v.length > 0 && objRows.length === v.length) {
+                  // Array de objetos anidado (p.ej. amortizacion.cuotas) → tabla legible.
+                  const cols = Array.from(new Set(v.flatMap((o) => Object.keys(o as Record<string, unknown>))));
+                  return (
+                    <div key={k} className="mb-1">
+                      <span className="text-muted small">{k.replace(/_/g, ' ')} ({v.length}):</span>
+                      <div className="table-responsive mt-1" style={{ maxHeight: 320, overflow: 'auto' }}>
+                        <table className="table table-sm table-bordered mb-0" style={{ fontSize: '.75rem' }}>
+                          <thead className="table-light" style={{ position: 'sticky', top: 0 }}>
+                            <tr>{cols.map((c) => <th key={c}>{c.replace(/_/g, ' ')}</th>)}</tr>
+                          </thead>
+                          <tbody>
+                            {(v as Record<string, unknown>[]).map((row, ri) => (
+                              <tr key={ri}>{cols.map((c) => <td key={c}>{fmtNum(row[c])}</td>)}</tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                }
                 return (
                   <div key={k} className="row mb-1">
                     <div className="col-4 text-muted small">{k.replace(/_/g, ' ')}</div>
-                    <div className="col-8">{v.join(', ')}</div>
+                    <div className="col-8">{v.map((x) => fmtNum(x)).join(', ')}</div>
                   </div>
                 );
               }
@@ -74,7 +177,7 @@ function renderField(key: string, value: unknown, onChange: (k: string, v: unkno
                     {Object.entries(v as Record<string, unknown>).map(([sk, sv]) => (
                       <div key={sk} className="row mb-0">
                         <div className="col-4 text-muted">{sk.replace(/_/g, ' ')}</div>
-                        <div className="col-8">{Array.isArray(sv) ? (sv as unknown[]).join(', ') : String(sv ?? '')}</div>
+                        <div className="col-8">{Array.isArray(sv) ? (sv as unknown[]).map((x) => fmtNum(x)).join(', ') : fmtNum(sv)}</div>
                       </div>
                     ))}
                   </div>
@@ -86,10 +189,10 @@ function renderField(key: string, value: unknown, onChange: (k: string, v: unkno
                 <div className="col-4 text-muted small">{k.replace(/_/g, ' ')}</div>
                 <div className="col-8">
                   {readOnly
-                    ? <span>{String(v ?? '')}</span>
-                    : <input className="form-control form-control-sm" value={String(v ?? '')}
-                        onChange={(e) => {
-                          const updated = { ...(value as Record<string, unknown>), [k]: e.target.value };
+                    ? <span>{fmtNum(v)}</span>
+                    : <EditNum value={v}
+                        onChange={(val) => {
+                          const updated = { ...(value as Record<string, unknown>), [k]: val };
                           onChange(key, updated);
                         }} />}
                 </div>
@@ -108,12 +211,12 @@ function renderField(key: string, value: unknown, onChange: (k: string, v: unkno
     <div key={key} className="mb-2">
       <label className="form-label small text-muted">{label}</label>
       {readOnly
-        ? <div style={{ fontSize: '.9rem', whiteSpace: 'pre-wrap' }}>{strVal}</div>
-        : isLongText
-          ? <textarea className="form-control form-control-sm" rows={Math.min(8, Math.max(3, Math.ceil(strVal.length / 80)))}
-              value={strVal} onChange={(e) => onChange(key, e.target.value)} />
-          : <input className="form-control form-control-sm" value={strVal}
-              onChange={(e) => onChange(key, e.target.value)} />}
+        ? (looksNumeric(value)
+            ? <div style={{ fontSize: '.9rem' }}>{fmtNum(value)}</div>
+            : <CollapsibleText text={strVal} />)
+        : <EditNum value={value} textarea={isLongText}
+            rows={isLongText ? Math.min(8, Math.max(3, Math.ceil(strVal.length / 80))) : undefined}
+            onChange={(val) => onChange(key, val)} />}
     </div>
   );
 }

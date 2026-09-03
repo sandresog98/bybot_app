@@ -99,6 +99,42 @@ model ControlLog {
   @@map("control_logs")
 }
 
+// ============= entidades (clientes / cooperativas) =============
+
+model Entidad {
+  id         Int      @id @default(autoincrement())
+  codigo     String   @unique @db.VarChar(50)
+  nombre     String   @db.VarChar(150)
+  nit        String?  @db.VarChar(30)
+  activo     Int      @default(1) @db.TinyInt
+  created_at DateTime @default(now())
+
+  tipos_doc EntidadTipoDoc[]
+  procesos  Proceso[]
+  prompts   AppPrompt[]
+
+  @@index([codigo], name: "idx_entidad_codigo")
+  @@index([activo], name: "idx_entidad_activo")
+  @@map("entidades")
+}
+
+model EntidadTipoDoc {
+  id               Int    @id @default(autoincrement())
+  entidad_id       Int
+  clave            String @db.VarChar(50)
+  label            String @db.VarChar(120)
+  categoria_logica String @db.VarChar(50)
+  obligatorio      Int    @default(0) @db.TinyInt
+  orden            Int    @default(0)
+  activo           Int    @default(1) @db.TinyInt
+
+  entidad Entidad @relation(fields: [entidad_id], references: [id], onDelete: Cascade)
+
+  @@unique([entidad_id, categoria_logica], name: "uk_etd_entidad_categoria")
+  @@index([entidad_id], name: "idx_etd_entidad")
+  @@map("entidades_tipos_doc")
+}
+
 // ============= app transversal =============
 
 model AppConfiguracion {
@@ -120,6 +156,7 @@ model AppPrompt {
   nombre     String   @db.VarChar(100)
   version    String   @db.VarChar(20)
   tipo       String   @db.VarChar(50)
+  entidad_id Int?
   contenido  String   @db.MediumText
   activo     Int      @default(0) @db.TinyInt
   notas      String?
@@ -128,9 +165,11 @@ model AppPrompt {
   updated_at DateTime @default(now()) @updatedAt
 
   creado_por_user ControlUsuario? @relation("AppPromptCreador", fields: [creado_por], references: [id], onDelete: SetNull)
+  entidad         Entidad?        @relation(fields: [entidad_id], references: [id], onDelete: Cascade)
 
   @@unique([nombre, version], name: "uk_prompt_nombre_version")
   @@index([tipo], name: "idx_prompt_tipo")
+  @@index([entidad_id], name: "idx_prompt_entidad")
   @@index([activo], name: "idx_prompt_activo")
   @@map("app_prompts")
 }
@@ -170,6 +209,7 @@ model Proceso {
   id                Int       @id @default(autoincrement())
   codigo            String    @unique @db.VarChar(50)
   tipo              String    @default("cobranza") @db.VarChar(30)
+  entidad_id        Int?
   estado            String    @default("creado") @db.VarChar(30)
   prioridad         Int       @default(5)
   creado_por        Int?
@@ -185,6 +225,7 @@ model Proceso {
 
   creado_por_user ControlUsuario? @relation("ProcesosCreados", fields: [creado_por], references: [id], onDelete: SetNull)
   asignado_a_user ControlUsuario? @relation("ProcesosAsignados", fields: [asignado_a], references: [id], onDelete: SetNull)
+  entidad         Entidad?        @relation(fields: [entidad_id], references: [id], onDelete: SetNull)
   archivos        ProcesoArchivo[]
   datos_ia        ProcesosDatosIa[]
   historial       ProcesosHistorial[]
@@ -194,6 +235,7 @@ model Proceso {
   @@index([codigo], name: "idx_proc_codigo")
   @@index([estado], name: "idx_proc_estado")
   @@index([tipo], name: "idx_proc_tipo")
+  @@index([entidad_id], name: "idx_proc_entidad")
   @@index([prioridad], name: "idx_proc_prioridad")
   @@index([creado_por], name: "idx_proc_creado")
   @@index([created_at], name: "idx_proc_fecha_creado")
@@ -233,6 +275,8 @@ model ProcesosDatosIa {
   metadata         Json?
   modelo           String?   @db.VarChar(50)
   tokens_total     Int?
+  tokens_entrada   Int?
+  tokens_salida    Int?
   fecha_analisis   DateTime  @default(now())
   validado_por     Int?
   fecha_validacion DateTime? @db.DateTime

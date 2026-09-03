@@ -3,7 +3,7 @@
   "roles": {
     "admin": {
       "label": "Administrador",
-      "modulos": ["dashboard", "procesos", "analisis", "prompts", "usuarios", "configuracion"]
+      "modulos": ["dashboard", "procesos", "analisis", "entidades", "prompts", "usuarios", "configuracion"]
     },
     "supervisor": {
       "label": "Supervisor",

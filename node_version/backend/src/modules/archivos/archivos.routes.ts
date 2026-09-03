@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { ok, err, badRequest, notFound } from '../../core/errors.js';
-import { archivoTipoSchema } from './archivos.schema.js';
+import { tipoFormatSchema } from './archivos.schema.js';
 import * as svc from './archivos.service.js';
 
 export async function archivosRoutes(app: FastifyInstance) {
@@ -14,7 +14,9 @@ export async function archivosRoutes(app: FastifyInstance) {
 
     const fields = data.fields as Record<string, { value?: string }>;
     const tipoRaw = fields?.tipo?.value ?? 'anexo';
-    const parsedTipo = archivoTipoSchema.safeParse(tipoRaw);
+    // Validación de FORMATO (whitelist de caracteres); la validación de negocio
+    // (tipo ∈ catálogo de la entidad del proceso) la hace el service.
+    const parsedTipo = tipoFormatSchema.safeParse(tipoRaw);
     if (!parsedTipo.success) return rep.code(400).send(err('Tipo inválido', parsedTipo.error.flatten()));
 
     const buf = await data.toBuffer();

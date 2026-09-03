@@ -1,7 +1,7 @@
 # ByBot App — Monorepo Node/TS
 
 App de **carga de archivos + análisis con IA + consultas bot** para procesos del estudio
-jurídico/cobranza. Fases F0b → F3 funcionales.
+jurídico/cobranza. Fases F0b → F3 funcionales **+ F4: ingesta multi-entidad**.
 
 ## Stack
 - **Backend**: Node + TypeScript + Fastify + Prisma (puerto `3001`)
@@ -12,21 +12,28 @@ jurídico/cobranza. Fases F0b → F3 funcionales.
 - **bots/**: bots Python de registros públicos, invocados por `bot_runner.py` vía cola
 - **BD**: MariaDB `bybot_consolidado` (DDL en `sql/ddl.sql`)
 
+## F4 — Multi-entidad (resumen)
+Cada **entidad** (cliente/cooperativa) define su catálogo de documentos y sus prompts; el
+análisis mapea todo a categorías canónicas. Módulo **Entidades** (admin) para gestionarlo.
+Soporta PDF, imágenes, **TIFF** (convertido a PDF), HTML y Excel; valida el tipo por *magic-bytes*.
+Guarda **tokens de entrada/salida y costo estimado** por proceso (tarjeta "Consumo IA").
+Detalle en [`handoff.md`](handoff.md) §1.b.
+
 ## Requisitos
-- Node 18+
-- XAMPP (MariaDB) arrancado — `/opt/lampp/bin/mysql`
-- Python 3.10+ (para bots y botworker)
+- Node 18+ · Python 3.10+ (bots y botworker) · MariaDB/MySQL
+- **macOS (este entorno)**: Docker vía **Colima** + registro de paquetes **Fury** — ver
+  [`handoff.md`](handoff.md) §1.a (la BD corre en contenedor, no XAMPP).
 
 ## Puesta en marcha rápida
 ```bash
 # 1. Variables de entorno
-cp .env.example .env
+cp .env.example .env            # ajustar DATABASE_URL, GEMINI_API_KEY, tokens internos
 
 # 2. Instalar dependencias (todos los workspaces)
-npm install
+npm install                     # en Fury: `fury registry login` si da 403
 
 # 3. Crear/reiniciar la BD
-npm run db:reset
+npm run db:reset                # Linux/XAMPP. En macOS/Docker: ver handoff.md §1.a
 
 # 4. Generar cliente Prisma
 npm run db:generate
@@ -49,8 +56,8 @@ Daemons Python (análisis y consultas bot):
 
 ## Login por defecto
 - Usuario: `admin`
-- Contraseña: `admin123`
-- **Importante**: la contraseña es de un solo uso → te pedirá cambiarla al primer ingreso.
+- Contraseña: `admin123` (de un solo uso → te pedirá cambiarla al primer ingreso).
+- En la BD de desarrollo de este entorno ya fue cambiada a `admin555`.
 
 ## Documentación
 - [`docs/plan_app/PLAN_DESARROLLO.md`](docs/plan_app/PLAN_DESARROLLO.md) — plan detallado Fase 0b → Fase 3.

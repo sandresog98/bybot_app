@@ -27,13 +27,30 @@ def dict_cursor(conn):
     return conn.cursor(dictionary=True)
 
 
-def get_prompts_activos(conn) -> dict[str, str]:
-    """Retorna {tipo: contenido} de los prompts activos."""
+def get_prompts_activos(conn, entidad_id: Optional[int] = None) -> dict[str, str]:
+    """
+    Retorna {categoria: contenido} de los prompts activos.
+
+    Selección del más específico: si existe un prompt de la entidad para una
+    categoría, gana sobre el prompt global (entidad_id IS NULL) de esa categoría.
+    Los prompts específicos de OTRAS entidades se ignoran.
+    """
     cur = dict_cursor(conn)
-    cur.execute("SELECT tipo, contenido FROM app_prompts WHERE activo = 1")
+    cur.execute("SELECT tipo, entidad_id, contenido FROM app_prompts WHERE activo = 1")
     rows = cur.fetchall()
     cur.close()
-    return {r["tipo"]: r["contenido"] for r in rows}
+
+    globales: dict[str, str] = {}
+    especificos: dict[str, str] = {}
+    for r in rows:
+        tipo = r["tipo"]
+        eid = r["entidad_id"]
+        if eid is None:
+            globales[tipo] = r["contenido"]
+        elif entidad_id is not None and eid == entidad_id:
+            especificos[tipo] = r["contenido"]
+    # el específico de la entidad pisa al global
+    return {**globales, **especificos}
 
 
 def get_proceso_archivos(conn, proceso_id: int) -> list[dict]:
@@ -57,13 +74,16 @@ def get_proceso(conn, proceso_id: int) -> Optional[dict]:
     return row
 
 
-def insert_datos_ia(conn, proceso_id: int, datos: dict, modelo: str, tokens_total: int, metadata: dict) -> int:
+def insert_datos_ia(conn, proceso_id: int, datos: dict, modelo: str, tokens_total: int, metadata: dict,
+                    tokens_entrada: int = 0, tokens_salida: int = 0) -> int:
     """Inserta una fila en procesos_datos_ia. Devuelve el id."""
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO procesos_datos_ia (proceso_id, version, datos_originales, metadata, modelo, tokens_total) "
-        "VALUES (%s, 1, %s, %s, %s, %s)",
-        (proceso_id, json.dumps(datos, ensure_ascii=False), json.dumps(metadata, ensure_ascii=False), modelo, tokens_total),
+        "INSERT INTO procesos_datos_ia "
+        "(proceso_id, version, datos_originales, metadata, modelo, tokens_total, tokens_entrada, tokens_salida) "
+        "VALUES (%s, 1, %s, %s, %s, %s, %s, %s)",
+        (proceso_id, json.dumps(datos, ensure_ascii=False), json.dumps(metadata, ensure_ascii=False),
+         modelo, tokens_total, tokens_entrada, tokens_salida),
     )
     conn.commit()
     last_id = cur.lastrowid

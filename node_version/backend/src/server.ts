@@ -11,6 +11,7 @@ import { healthRoutes } from './modules/health.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import { dashboardRoutes } from './modules/dashboard/dashboard.routes.js';
 import { procesosRoutes } from './modules/procesos/procesos.routes.js';
+import { entidadesRoutes } from './modules/entidades/entidades.routes.js';
 import { archivosRoutes } from './modules/archivos/archivos.routes.js';
 import { analisisRoutes } from './modules/analisis/analisis.routes.js';
 import { promptsRoutes } from './modules/prompts/prompts.routes.js';
@@ -44,6 +45,7 @@ async function main() {
     await api.register(authRoutes, { prefix: '/auth' });
     await api.register(dashboardRoutes, { prefix: '/dashboard' });
     await api.register(procesosRoutes, { prefix: '/procesos' });
+    await api.register(entidadesRoutes, { prefix: '/entidades' });
     await api.register(archivosRoutes); // rutas /procesos/:id/archivos + /archivos/*
     await api.register(analisisRoutes);  // rutas /procesos/:id/analizar + /procesos/:id/analisis/*
     await api.register(promptsRoutes, { prefix: '/prompts' });

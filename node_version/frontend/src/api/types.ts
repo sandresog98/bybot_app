@@ -39,10 +39,52 @@ export type ProcesoEstado =
   | 'creado' | 'archivos_cargados' | 'en_analisis' | 'analizado'
   | 'validado' | 'completado' | 'error' | 'cancelado';
 
+export interface Entidad {
+  id: number;
+  codigo: string;
+  nombre: string;
+  nit: string | null;
+}
+
+export interface EntidadAdmin extends Entidad {
+  activo: boolean;
+  created_at: string;
+  total_tipos_doc: number;
+  total_procesos: number;
+  total_prompts: number;
+}
+
+export interface EntidadTipoDoc {
+  value: string;      // categoría lógica canónica (se envía como `tipo` al subir)
+  label: string;
+  clave: string;
+  obligatorio: boolean;
+  orden: number;
+}
+
+// Fila cruda del catálogo (administración)
+export interface EntidadTipoDocFull {
+  id: number;
+  entidad_id: number;
+  clave: string;
+  label: string;
+  categoria_logica: string;
+  obligatorio: number;   // 0/1
+  orden: number;
+  activo: number;        // 0/1
+}
+
+export const CATEGORIAS_LOGICAS = [
+  'pagare', 'estado_cuenta', 'amortizacion', 'vinculacion', 'poder', 'anexo', 'identificacion', 'otro',
+] as const;
+
 export interface Proceso {
   id: number;
   codigo: string;
   tipo: ProcesoTipo;
+  entidad_id: number | null;
+  entidad: string | null;
+  entidad_codigo: string | null;
   estado: ProcesoEstado;
   prioridad: number;
   creado_por: string | null;
@@ -88,6 +130,9 @@ export interface Prompt {
   nombre: string;
   version: string;
   tipo: string;
+  entidad_id: number | null;
+  entidad: string | null;
+  entidad_codigo: string | null;
   contenido: string;
   activo: boolean;
   notas: string | null;
@@ -124,9 +169,21 @@ export interface AnalisisDatos {
   metadata: Record<string, unknown> | null;
   modelo: string | null;
   tokens_total: number | null;
+  tokens_entrada: number | null;
+  tokens_salida: number | null;
+  costo_estimado_usd?: number;
   fecha_analisis: string;
   validado_por: number | null;
   fecha_validacion: string | null;
+}
+
+export interface ConsumoIa {
+  analisis_count: number;
+  tokens_entrada: number;
+  tokens_salida: number;
+  tokens_total: number;
+  costo_estimado_usd: number;
+  precios: { entrada: number; salida: number };
 }
 
 // Usuarios

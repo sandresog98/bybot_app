@@ -73,8 +73,8 @@ export default function ConsultasResult({ consultas }: Props) {
                         </div>
                       ) : c.estado === 'exitoso' ? (
                         <div className="small">
-                          {resumen?.estado && <div className="text-muted">Estado: {String(resumen.estado)}</div>}
-                          {resumen?.motivo && <div className="text-muted text-truncate" title={String(resumen.motivo)}>{String(resumen.motivo)}</div>}
+                          {Boolean(resumen?.estado) && <div className="text-muted">Estado: {String(resumen!.estado)}</div>}
+                          {Boolean(resumen?.motivo) && <div className="text-muted text-truncate" title={String(resumen!.motivo)}>{String(resumen!.motivo)}</div>}
                         </div>
                       ) : (
                         <div className="small text-danger">

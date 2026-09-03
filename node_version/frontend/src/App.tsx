@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import Procesos from './pages/Procesos';
 import ProcesoDetalle from './pages/ProcesoDetalle';
 import Analisis from './pages/Analisis';
+import Entidades from './pages/Entidades';
 import Prompts from './pages/Prompts';
 import Usuarios from './pages/Usuarios';
 import Configuracion from './pages/Configuracion';
@@ -46,6 +47,7 @@ export default function App() {
       <Route path="/procesos" element={<RequireAuth><Procesos /></RequireAuth>} />
       <Route path="/procesos/:id" element={<RequireAuth><ProcesoDetalle /></RequireAuth>} />
       <Route path="/analisis" element={<RequireAuth><RequireModule mod="analisis"><Analisis /></RequireModule></RequireAuth>} />
+      <Route path="/entidades" element={<RequireAuth><RequireModule mod="entidades"><Entidades /></RequireModule></RequireAuth>} />
       <Route path="/prompts" element={<RequireAuth><RequireModule mod="prompts"><Prompts /></RequireModule></RequireAuth>} />
       <Route path="/usuarios" element={<RequireAuth><RequireModule mod="usuarios"><Usuarios /></RequireModule></RequireAuth>} />
       <Route path="/configuracion" element={<RequireAuth><RequireModule mod="configuracion"><Configuracion /></RequireModule></RequireAuth>} />

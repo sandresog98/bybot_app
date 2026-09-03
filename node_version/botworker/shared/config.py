@@ -15,6 +15,11 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 GEMINI_TEMPERATURE = float(os.getenv("GEMINI_TEMPERATURE", "0.1"))
 GEMINI_MAX_TOKENS = int(os.getenv("GEMINI_MAX_TOKENS", "4000"))
+# Presupuesto de "thinking" (razonamiento) de Gemini 2.5:
+#   0  = desactivado (recomendado para extracción: menor costo y latencia)
+#  -1  = dinámico/automático (el modelo decide)
+#  >0  = presupuesto fijo de tokens de razonamiento
+GEMINI_THINKING_BUDGET = int(os.getenv("GEMINI_THINKING_BUDGET", "0"))
 
 # ===== Base de datos =====
 DB_HOST = os.getenv("DB_HOST", "127.0.0.1")

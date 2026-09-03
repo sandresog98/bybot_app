@@ -9,6 +9,20 @@ async function getConfig(clave: string): Promise<string | null> {
   return row?.valor ?? null;
 }
 
+/** Precios IA (USD por 1M tokens) desde config, con defaults seguros. */
+async function getPreciosIa(): Promise<{ entrada: number; salida: number }> {
+  const [pin, pout] = await Promise.all([
+    getConfig('precio_ia_entrada_usd_1m'),
+    getConfig('precio_ia_salida_usd_1m'),
+  ]);
+  return { entrada: Number(pin ?? '0.30') || 0, salida: Number(pout ?? '2.50') || 0 };
+}
+
+function costoUsd(tokensEntrada: number, tokensSalida: number, precios: { entrada: number; salida: number }): number {
+  const c = (tokensEntrada / 1_000_000) * precios.entrada + (tokensSalida / 1_000_000) * precios.salida;
+  return Math.round(c * 1_000_000) / 1_000_000; // redondeo a 6 decimales
+}
+
 /** Encola un trabajo de análisis para el proceso. Devuelve { job_id }. */
 export async function encolarAnalisis(procesoId: number, usuarioId: number) {
   const proc = await prisma.proceso.findUnique({ where: { id: procesoId }, select: { id: true, estado: true, codigo: true } });
@@ -47,12 +61,42 @@ export async function getEstadoTrabajo(procesoId: number) {
   return job;
 }
 
-/** Último resultados_datos_ia del proceso. */
+/** Último resultados_datos_ia del proceso, con costo estimado de esa corrida. */
 export async function getResultados(procesoId: number) {
-  return prisma.procesosDatosIa.findFirst({
+  const row = await prisma.procesosDatosIa.findFirst({
     where: { proceso_id: procesoId },
-    orderBy: { version: 'desc' },
+    orderBy: { fecha_analisis: 'desc' },
   });
+  if (!row) return null;
+  const precios = await getPreciosIa();
+  return {
+    ...row,
+    costo_estimado_usd: costoUsd(row.tokens_entrada ?? 0, row.tokens_salida ?? 0, precios),
+  };
+}
+
+/**
+ * Consumo IA agregado del proceso: suma de TODAS sus corridas de análisis
+ * (re-analizar crea filas nuevas y cada llamada a Gemini cuesta).
+ */
+export async function getConsumoProceso(procesoId: number) {
+  const agg = await prisma.procesosDatosIa.aggregate({
+    where: { proceso_id: procesoId },
+    _sum: { tokens_entrada: true, tokens_salida: true, tokens_total: true },
+    _count: true,
+  });
+  const tokens_entrada = agg._sum.tokens_entrada ?? 0;
+  const tokens_salida = agg._sum.tokens_salida ?? 0;
+  const tokens_total = agg._sum.tokens_total ?? 0;
+  const precios = await getPreciosIa();
+  return {
+    analisis_count: agg._count,
+    tokens_entrada,
+    tokens_salida,
+    tokens_total,
+    costo_estimado_usd: costoUsd(tokens_entrada, tokens_salida, precios),
+    precios,
+  };
 }
 
 /** Valida los datos del análisis IA y actualiza el proceso. */

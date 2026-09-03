@@ -7,8 +7,14 @@ import type { z } from 'zod';
 export async function listPrompts() {
   const rows = await prisma.appPrompt.findMany({
     orderBy: [{ activo: 'desc' }, { nombre: 'asc' }],
+    include: { entidad: { select: { id: true, nombre: true, codigo: true } } },
   });
-  return rows.map((r) => ({ ...r, activo: r.activo === 1 }));
+  return rows.map((r) => ({
+    ...r,
+    activo: r.activo === 1,
+    entidad: r.entidad?.nombre ?? null,
+    entidad_codigo: r.entidad?.codigo ?? null,
+  }));
 }
 
 export async function getPrompt(id: number) {
@@ -28,6 +34,7 @@ export async function createPrompt(data: z.infer<typeof createPromptSchema>, usu
       nombre: data.nombre,
       version: data.version,
       tipo: data.tipo,
+      entidad_id: data.entidad_id ?? null,
       contenido: data.contenido,
       notas: data.notas ?? null,
       activo: data.activo ? 1 : 0,
@@ -54,6 +61,7 @@ export async function updatePrompt(id: number, data: z.infer<typeof updatePrompt
       ...(data.nombre !== undefined && { nombre: data.nombre }),
       ...(data.version !== undefined && { version: data.version }),
       ...(data.tipo !== undefined && { tipo: data.tipo }),
+      ...(data.entidad_id !== undefined && { entidad_id: data.entidad_id }),
       ...(data.contenido !== undefined && { contenido: data.contenido }),
       ...(data.notas !== undefined && { notas: data.notas }),
       ...(data.activo !== undefined && { activo: data.activo ? 1 : 0 }),
@@ -86,9 +94,11 @@ export async function activatePrompt(id: number, usuarioId: number) {
   const p = await prisma.appPrompt.findUnique({ where: { id } });
   if (!p) throw notFound('Prompt no encontrado');
 
+  // Solo un prompt activo por combinación (tipo, entidad). El global (entidad_id NULL)
+  // y el específico de cada entidad son mutuamente independientes.
   await prisma.$transaction([
     prisma.appPrompt.updateMany({
-      where: { tipo: p.tipo, activo: 1 },
+      where: { tipo: p.tipo, entidad_id: p.entidad_id, activo: 1 },
       data: { activo: 0 },
     }),
     prisma.appPrompt.update({
@@ -100,7 +110,7 @@ export async function activatePrompt(id: number, usuarioId: number) {
   await audit('prompts', 'activar', usuarioId, {
     entidad_tipo: 'prompt',
     entidad_id: id,
-    detalle: `Prompt "${p.nombre}" v${p.version} activado (tipo ${p.tipo}).`,
+    detalle: `Prompt "${p.nombre}" v${p.version} activado (tipo ${p.tipo}, entidad ${p.entidad_id ?? 'global'}).`,
   });
 
   const updated = await prisma.appPrompt.findUnique({ where: { id } });

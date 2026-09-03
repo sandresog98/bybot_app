@@ -1,18 +1,14 @@
 import { useState } from 'react';
-import { usePrompts, useCreatePrompt, useUpdatePrompt, useDeletePrompt, useActivatePrompt } from '../api/queries';
+import { usePrompts, useCreatePrompt, useUpdatePrompt, useDeletePrompt, useActivatePrompt, useEntidades } from '../api/queries';
 import { useAuth } from '../auth/useAuth';
-import type { Prompt } from '../api/types';
+import { CATEGORIAS_LOGICAS, type Prompt } from '../api/types';
 
 type ModalMode = 'create' | 'edit' | null;
 
-const PROMPT_TIPOS = [
-  { value: 'estado_cuenta', label: 'Estado de cuenta' },
-  { value: 'anexos', label: 'Anexos' },
-  { value: 'vinculacion', label: 'Vinculación' },
-  { value: 'otros', label: 'Otros' },
-];
+// Categorías canónicas + 'anexos' (prompt global heredado).
+const PROMPT_TIPOS = [...CATEGORIAS_LOGICAS, 'anexos'].map((c) => ({ value: c, label: c }));
 
-const emptyForm = { nombre: '', version: 'v1', tipo: 'estado_cuenta', contenido: '', notas: '', activo: false };
+const emptyForm = { nombre: '', version: 'v1', tipo: 'estado_cuenta', entidad_id: '' as string, contenido: '', notas: '', activo: false };
 
 export default function Prompts() {
   const { data, isLoading, error } = usePrompts();
@@ -22,11 +18,13 @@ export default function Prompts() {
   const activateMut = useActivatePrompt();
   const { user } = useAuth();
   const isAdmin = user?.rol === 'admin';
+  const { data: entidades } = useEntidades(!!user);
 
   const [modal, setModal] = useState<ModalMode>(null);
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [filtroEntidad, setFiltroEntidad] = useState('');
 
   const openCreate = () => {
     setForm(emptyForm);
@@ -35,7 +33,7 @@ export default function Prompts() {
   };
 
   const openEdit = (p: Prompt) => {
-    setForm({ nombre: p.nombre, version: p.version, tipo: p.tipo, contenido: p.contenido, notas: p.notas ?? '', activo: p.activo });
+    setForm({ nombre: p.nombre, version: p.version, tipo: p.tipo, entidad_id: p.entidad_id != null ? String(p.entidad_id) : '', contenido: p.contenido, notas: p.notas ?? '', activo: p.activo });
     setEditId(p.id);
     setModal('edit');
   };
@@ -45,16 +43,20 @@ export default function Prompts() {
   const handleSave = async () => {
     if (!form.nombre || !form.version || !form.tipo || !form.contenido) return;
     setSaving(true);
+    const payload = { ...form, entidad_id: form.entidad_id ? Number(form.entidad_id) : null };
     try {
       if (modal === 'create') {
-        await createMut.mutateAsync(form);
+        await createMut.mutateAsync(payload);
       } else if (editId != null) {
-        await updateMut.mutateAsync({ id: editId, data: form });
+        await updateMut.mutateAsync({ id: editId, data: payload });
       }
       closeModal();
     } catch { /* toast handled by interceptor */ }
     setSaving(false);
   };
+
+  const filtered = (data ?? []).filter((p) =>
+    filtroEntidad === '' ? true : filtroEntidad === 'global' ? p.entidad_id == null : String(p.entidad_id) === filtroEntidad);
 
   const handleDelete = (id: number, nombre: string) => {
     if (!confirm(`¿Eliminar el prompt "${nombre}"?`)) return;
@@ -80,12 +82,21 @@ export default function Prompts() {
 
       {error && <div className="alert alert-danger">No se pudo cargar.</div>}
 
+      <div className="mb-2" style={{ maxWidth: 280 }}>
+        <select className="form-select form-select-sm" value={filtroEntidad} onChange={(e) => setFiltroEntidad(e.target.value)}>
+          <option value="">Todas las entidades</option>
+          <option value="global">Global (sin entidad)</option>
+          {entidades?.map((en) => <option key={en.id} value={en.id}>{en.nombre}</option>)}
+        </select>
+      </div>
+
       <table className="table table-sm align-middle">
         <thead>
           <tr>
             <th>Nombre</th>
             <th>Versión</th>
-            <th>Tipo</th>
+            <th>Categoría</th>
+            <th>Entidad</th>
             <th>Activo</th>
             <th>Actualizado</th>
             {isAdmin && <th></th>}
@@ -93,12 +104,13 @@ export default function Prompts() {
         </thead>
         <tbody>
           {isLoading
-            ? <tr><td colSpan={isAdmin ? 6 : 5} className="text-center text-muted">Cargando…</td></tr>
-            : data?.map((p) => (
+            ? <tr><td colSpan={isAdmin ? 7 : 6} className="text-center text-muted">Cargando…</td></tr>
+            : filtered.map((p) => (
                 <tr key={p.id}>
                   <td><code>{p.nombre}</code></td>
                   <td>{p.version}</td>
                   <td>{p.tipo}</td>
+                  <td className="small">{p.entidad ?? <span className="text-muted">Global</span>}</td>
                   <td>
                     {p.activo
                       ? <span className="badge bg-success"><i className="bi bi-check2" /> Activo</span>
@@ -141,10 +153,18 @@ export default function Prompts() {
                     <input className="form-control form-control-sm" value={form.version} onChange={(e) => setForm({ ...form, version: e.target.value })} />
                   </div>
                   <div className="col-3">
-                    <label className="form-label small">Tipo</label>
+                    <label className="form-label small">Categoría</label>
                     <select className="form-select form-select-sm" value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
                       {PROMPT_TIPOS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                     </select>
+                  </div>
+                  <div className="col-6">
+                    <label className="form-label small">Entidad</label>
+                    <select className="form-select form-select-sm" value={form.entidad_id} onChange={(e) => setForm({ ...form, entidad_id: e.target.value })}>
+                      <option value="">Global (todas las entidades)</option>
+                      {entidades?.map((en) => <option key={en.id} value={en.id}>{en.nombre}</option>)}
+                    </select>
+                    <div className="form-text">El prompt de una entidad tiene prioridad sobre el global de su misma categoría.</div>
                   </div>
                   <div className="col-12">
                     <label className="form-label small">Contenido del prompt</label>

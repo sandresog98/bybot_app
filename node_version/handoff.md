@@ -11,7 +11,8 @@ está hecho, qué falta y qué pasos ejecutar.
 ## 1. Estado general del proyecto
 
 App de **carga de archivos + análisis con IA + consultas bot** para procesos de un estudio
-jurídico/cobranza. Fases F0b→F3 completadas y funcionales.
+jurídico/cobranza. Fases F0b→F3 completadas y funcionales. **+ F4: ingesta multi-entidad**
+(ver §1.b).
 
 Servicios (los 3 corriendo):
 - **Backend** Fastify+Prisma → `http://localhost:3001` (health: `/api/v1/health`)
@@ -22,7 +23,90 @@ Daemons Python:
 - **Análisis** (Gemini): log en `/tmp/bydaemon.log`
 - **Bot runner** (consultas): log en `/tmp/bybotrunner.log`
 
-Login por defecto: `admin` / `admin123` (password de un solo uso → se pide cambiarla).
+Login: `admin` / **`admin555`** (la clave por defecto `admin123` es de un solo uso y ya fue
+cambiada en esta BD de desarrollo).
+
+---
+
+## 1.a Entorno en este Mac (macOS) — cómo levantar
+
+> El proyecto nació en Linux/XAMPP (`/opt/lampp/...`), pero aquí corre en macOS con Docker.
+> La red corporativa **bloquea el registro npm/PyPI público**; el único registro es **Fury**.
+
+1. **Docker = Colima** (no Docker Desktop): `colima start`.
+2. **Base de datos** (contenedor, no XAMPP):
+   ```bash
+   docker run -d --name bybot-mariadb -e MARIADB_ROOT_PASSWORD=bybot_root \
+     -e MARIADB_DATABASE=bybot_consolidado -p 3306:3306 mariadb:10.11
+   # cargar esquema (reemplaza a `npm run db:reset`, que usa el path XAMPP):
+   docker exec -i bybot-mariadb mariadb -uroot -pbybot_root bybot_consolidado < sql/ddl.sql
+   ```
+   Conexión en `.env`: `DATABASE_URL=mysql://root:bybot_root@127.0.0.1:3306/bybot_consolidado`.
+3. **Registro de paquetes (Fury)**: si `npm install`/`pip` da **403**, autenticar:
+   `PATH=~/.fury/fury_venv/bin:$PATH fury registry login` (las credenciales expiran ~8h).
+4. **Node**: `npm install` (raíz, workspaces) + `npm -w backend run db:generate`.
+5. **Python worker**: `python3 -m venv botworker/.venv`; `pip install -r botworker/requirements.txt -r bots/requirements.txt`;
+   `playwright install chromium`; `brew install tesseract`.
+6. **Arrancar**: `npm run dev` (3 servicios) y los daemons con `nohup` (macOS no tiene `setsid`):
+   ```bash
+   nohup ./botworker/.venv/bin/python botworker/daemon.py     > /tmp/bydaemon.log 2>&1 &
+   nohup ./botworker/.venv/bin/python botworker/bot_runner.py > /tmp/bybotrunner.log 2>&1 &
+   ```
+   Tras editar `analizador.py` o cambiar la `GEMINI_API_KEY`/config del `.env`, **reiniciar el daemon**.
+
+---
+
+## 1.b F4 — Ingesta multi-entidad de documentos (sesión reciente)
+
+Cada **entidad** (cliente/cooperativa) define su propio catálogo de documentos y sus prompts;
+el análisis mapea todo a una **taxonomía canónica** (`pagare, estado_cuenta, amortizacion,
+vinculacion, poder, anexo, identificacion, otro`).
+
+- **Datos**: tablas `entidades` y `entidades_tipos_doc`; `procesos.entidad_id`; `app_prompts.entidad_id`
+  (prompt específico de entidad gana sobre el global). Migraciones: `sql/migrations/f4_entidades.sql`,
+  `f4b_prompts_globales_y_catalogos.sql`, `f4c_tokens.sql`, `f4d_prompts_referencias.sql`,
+  `f4e_prompts_observaciones.sql`, `f4f_crearcoop_estado_cuenta.sql` (f4/f4b/f4c reflejadas en `sql/ddl.sql`;
+  f4d–f4f solo como migración — aplicar sobre la BD existente).
+- **Backend**: módulo `entidades/` (CRUD admin + `GET /entidades`, `/entidades/:id/tipos-doc`,
+  `/entidades/:id/catalogo`). `archivos.service.ts` valida el `tipo` contra el catálogo de la entidad,
+  detecta el MIME por **magic-bytes** (anti-spoofing) y acepta **TIFF**.
+- **Worker** `analizador.py`: bucle genérico por categoría (una llamada Gemini por categoría),
+  fusión canónica, reintentos ante 429/503, reparación de JSON truncado, y **deduplicación de listas**
+  (`_dedupe_lists`, mitiga bucles de repetición del modelo). `shared/documentos.py` convierte
+  **TIFF→PDF** con Pillow (Gemini no lee TIFF). Guarda `tokens_entrada/salida`. **Thinking desactivado**
+  por defecto (`GEMINI_THINKING_BUDGET=0`).
+- **Calidad de extracción (prompts)**: se endurecieron los prompts para evitar dos fallos vistos:
+  (a) `referencias` repetidas en bucle (f4d) y (b) `observaciones` con transcripción de cláusulas
+  legales (f4e → "resumen breve, no transcribir"). Además **prompt específico de Crearcoop para
+  estado_cuenta** (f4f): su documento es un *detalle de movimientos*, no un resumen; el prompt captura
+  la tabla de `movimientos` y usa la fila final **"TOTAL SALDO A CARGO A: <fecha>"** como resumen
+  (calcula `total_deuda` = suma de sus columnas).
+- **Frontend**: módulo **Entidades** (sidebar, admin) para CRUD + catálogo; selector de entidad al
+  crear proceso; tipos de documento dinámicos; `ValidacionForm` renderiza arrays de objetos como
+  **tabla** (amortización, movimientos, referencias); **formato numérico es-CO solo visual**
+  (miles `.`/decimales `,`, sin alterar el dato guardado — inputs muestran crudo al enfocar);
+  textos largos con **"ver más/menos"** (`CollapsibleText`); tarjeta **"Consumo IA"** (tokens + costo USD).
+- **Config IA** (`.env` + `app_configuracion`): `GEMINI_MODEL=gemini-2.5-flash`,
+  `GEMINI_MAX_TOKENS=26000` (evita truncar amortizaciones largas), `GEMINI_THINKING_BUDGET=0`,
+  `precio_ia_entrada_usd_1m=0.30`, `precio_ia_salida_usd_1m=2.50`.
+
+**Entidades sembradas**: `confiar` (prompts propios), `crearcoop` (prompt propio de estado_cuenta),
+`somec` (prompts globales). Procesos de ejemplo: **Confiar** (id 2, 36 cuotas, 2 referencias),
+**Somec** (id 5, incluye `formulario.tif` → 48 cuotas), **Crearcoop** (id 3, 46 movimientos).
+Docs de muestra en `../archivos/{condiar,crearcoop,somec}/`.
+
+**Para añadir una entidad nueva**: crearla en el módulo Entidades (o SQL), definir su catálogo de
+documentos y —si su layout lo requiere— prompts específicos por categoría. Sin tocar código.
+
+**Pendiente / notas**:
+- **Reanalizar proceso 3 (Crearcoop)** cuando haya cuota: el prompt f4f ya está, pero la última
+  corrida quedó con `estado_cuenta` vacío porque el 429 (cuota diaria agotada) tumbó esa categoría.
+  Un reanálisis dejará el estado de cuenta completo con `total_deuda` (esperado **33.187.280**).
+- **Opción robusta pendiente**: calcular `total_deuda`/totales en el worker desde el array
+  `movimientos` (no depender de la aritmética del modelo). No implementado aún.
+- **Cuota Gemini**: el free-tier (RPD) se agota rápido con reanálisis repetidos; ante 429
+  `RESOURCE_EXHAUSTED` esperar el reset diario (medianoche PT) o usar key con facturación.
+- Otros: plantilla Excel descargable (regla 4.1) + `openpyxl` en el venv si se procesan `.xlsx`.
 
 ---
 

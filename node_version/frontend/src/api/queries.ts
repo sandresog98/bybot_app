@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
-import type { DashboardStats, User, Proceso, ProcesoDetalle, Usuario, UsuarioCreado, Prompt, AnalisisDatos, ProcesosConsulta } from './types';
+import type { DashboardStats, User, Proceso, ProcesoDetalle, Usuario, UsuarioCreado, Prompt, AnalisisDatos, ConsumoIa, ProcesosConsulta, Entidad, EntidadAdmin, EntidadTipoDoc, EntidadTipoDocFull } from './types';
 
 export async function login(usuario: string, password: string) {
   const r = await api.post('/auth/login', { usuario, password });
@@ -71,9 +71,110 @@ export function useProceso(id: number | null, tokenValid: boolean) {
 export function useCreateProceso() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { tipo?: string; prioridad?: number; notas?: string; asignado_a?: number }) =>
+    mutationFn: async (data: { tipo?: string; entidad_id?: number; prioridad?: number; notas?: string; asignado_a?: number }) =>
       (await api.post('/procesos', data)).data.data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['procesos'] }),
+  });
+}
+
+// ============= Entidades =============
+
+export function useEntidades(tokenValid: boolean) {
+  return useQuery<Entidad[]>({
+    queryKey: ['entidades'],
+    queryFn: async () => (await api.get('/entidades')).data.data,
+    enabled: tokenValid,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useEntidadTiposDoc(entidadId: number | null, tokenValid: boolean) {
+  return useQuery<EntidadTipoDoc[]>({
+    queryKey: ['entidad-tipos-doc', entidadId],
+    queryFn: async () => (await api.get(`/entidades/${entidadId}/tipos-doc`)).data.data,
+    enabled: tokenValid && entidadId != null,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// --- Administración de entidades (admin) ---
+
+export function useEntidadesAdmin(tokenValid: boolean) {
+  return useQuery<EntidadAdmin[]>({
+    queryKey: ['entidades-admin'],
+    queryFn: async () => (await api.get('/entidades/admin')).data.data,
+    enabled: tokenValid,
+  });
+}
+
+function invalidateEntidades(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ['entidades-admin'] });
+  qc.invalidateQueries({ queryKey: ['entidades'] });
+}
+
+export function useCreateEntidad() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { codigo: string; nombre: string; nit?: string; activo?: boolean }) =>
+      (await api.post('/entidades', data)).data.data as Entidad,
+    onSuccess: () => invalidateEntidades(qc),
+  });
+}
+
+export function useUpdateEntidad() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Record<string, unknown> }) =>
+      (await api.patch(`/entidades/${id}`, data)).data.data as Entidad,
+    onSuccess: () => invalidateEntidades(qc),
+  });
+}
+
+export function useDeleteEntidad() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => (await api.delete(`/entidades/${id}`)).data,
+    onSuccess: () => invalidateEntidades(qc),
+  });
+}
+
+export function useCatalogo(entidadId: number | null, tokenValid: boolean) {
+  return useQuery<EntidadTipoDocFull[]>({
+    queryKey: ['entidad-catalogo', entidadId],
+    queryFn: async () => (await api.get(`/entidades/${entidadId}/catalogo`)).data.data,
+    enabled: tokenValid && entidadId != null,
+  });
+}
+
+function invalidateCatalogo(qc: ReturnType<typeof useQueryClient>, entidadId: number) {
+  qc.invalidateQueries({ queryKey: ['entidad-catalogo', entidadId] });
+  qc.invalidateQueries({ queryKey: ['entidad-tipos-doc', entidadId] });
+  qc.invalidateQueries({ queryKey: ['entidades-admin'] });
+}
+
+export function useAddTipoDoc(entidadId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: Record<string, unknown>) =>
+      (await api.post(`/entidades/${entidadId}/tipos-doc`, data)).data.data,
+    onSuccess: () => invalidateCatalogo(qc, entidadId),
+  });
+}
+
+export function useUpdateTipoDoc(entidadId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ tid, data }: { tid: number; data: Record<string, unknown> }) =>
+      (await api.patch(`/entidades/tipos-doc/${tid}`, data)).data.data,
+    onSuccess: () => invalidateCatalogo(qc, entidadId),
+  });
+}
+
+export function useDeleteTipoDoc(entidadId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (tid: number) => (await api.delete(`/entidades/tipos-doc/${tid}`)).data,
+    onSuccess: () => invalidateCatalogo(qc, entidadId),
   });
 }
 
@@ -189,6 +290,14 @@ export function useAnalisisDatos(procesoId: number | null, enabled: boolean) {
   });
 }
 
+export function useConsumoProceso(procesoId: number | null, enabled: boolean) {
+  return useQuery<ConsumoIa>({
+    queryKey: ['analisis-consumo', procesoId],
+    queryFn: async () => (await api.get(`/procesos/${procesoId}/analisis/consumo`)).data.data,
+    enabled: enabled && procesoId != null,
+  });
+}
+
 export function useValidarProceso() {
   const qc = useQueryClient();
   return useMutation({
@@ -292,7 +401,7 @@ export function usePrompts() {
 export function useCreatePrompt() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { nombre: string; version: string; tipo: string; contenido: string; notas?: string; activo?: boolean }) =>
+    mutationFn: async (data: { nombre: string; version: string; tipo: string; entidad_id?: number | null; contenido: string; notas?: string; activo?: boolean }) =>
       (await api.post('/prompts', data)).data.data as Prompt,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['prompts'] }),
   });
@@ -301,7 +410,7 @@ export function useCreatePrompt() {
 export function useUpdatePrompt() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: Partial<{ nombre: string; version: string; tipo: string; contenido: string; notas: string; activo: boolean }> }) =>
+    mutationFn: async ({ id, data }: { id: number; data: Partial<{ nombre: string; version: string; tipo: string; entidad_id: number | null; contenido: string; notas: string; activo: boolean }> }) =>
       (await api.patch(`/prompts/${id}`, data)).data.data as Prompt,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['prompts'] }),
   });

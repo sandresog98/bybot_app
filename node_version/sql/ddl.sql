@@ -107,11 +107,41 @@ CREATE TABLE IF NOT EXISTS app_configuracion (
     INDEX idx_appcfg_categoria (categoria)
 ) ENGINE=InnoDB;
 
+-- Entidades (cliente/cooperativa que remite procesos) — F4
+CREATE TABLE IF NOT EXISTS entidades (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    codigo VARCHAR(50) NOT NULL UNIQUE,                    -- slug: confiar, crearcoop, somec
+    nombre VARCHAR(150) NOT NULL,
+    nit VARCHAR(30) NULL,
+    activo TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_entidad_codigo (codigo),
+    INDEX idx_entidad_activo (activo)
+) ENGINE=InnoDB;
+
+-- Catálogo de tipos de documento esperados por entidad — F4
+-- categoria_logica: pagare, estado_cuenta, amortizacion, vinculacion, poder, anexo, identificacion, otro
+CREATE TABLE IF NOT EXISTS entidades_tipos_doc (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    entidad_id INT NOT NULL,
+    clave VARCHAR(50) NOT NULL,
+    label VARCHAR(120) NOT NULL,
+    categoria_logica VARCHAR(50) NOT NULL,
+    obligatorio TINYINT(1) NOT NULL DEFAULT 0,
+    orden INT NOT NULL DEFAULT 0,
+    activo TINYINT(1) NOT NULL DEFAULT 1,
+    CONSTRAINT fk_etd_entidad FOREIGN KEY (entidad_id)
+        REFERENCES entidades(id) ON DELETE CASCADE,
+    UNIQUE KEY uk_etd_entidad_categoria (entidad_id, categoria_logica),
+    INDEX idx_etd_entidad (entidad_id)
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS app_prompts (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
     version VARCHAR(20) NOT NULL,
-    tipo VARCHAR(50) NOT NULL,                             -- valores: estado_cuenta, anexos, vinculacion, ...
+    tipo VARCHAR(50) NOT NULL,                             -- categoria_logica: estado_cuenta, amortizacion, pagare, vinculacion, anexos, ...
+    entidad_id INT NULL,                                   -- NULL = prompt global; el específico de la entidad gana
     contenido MEDIUMTEXT NOT NULL,
     activo TINYINT(1) NOT NULL DEFAULT 0,
     notas TEXT NULL,
@@ -120,8 +150,11 @@ CREATE TABLE IF NOT EXISTS app_prompts (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_prompt_creadopor FOREIGN KEY (creado_por)
         REFERENCES control_usuarios(id) ON DELETE SET NULL,
+    CONSTRAINT fk_prompt_entidad FOREIGN KEY (entidad_id)
+        REFERENCES entidades(id) ON DELETE CASCADE,
     UNIQUE KEY uk_prompt_nombre_version (nombre, version),
     INDEX idx_prompt_tipo (tipo),
+    INDEX idx_prompt_entidad (entidad_id),
     INDEX idx_prompt_activo (activo)
 ) ENGINE=InnoDB;
 
@@ -133,6 +166,7 @@ CREATE TABLE IF NOT EXISTS procesos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     codigo VARCHAR(50) NOT NULL UNIQUE,
     tipo VARCHAR(30) NOT NULL DEFAULT 'cobranza',          -- valores: cobranza, demanda, otro
+    entidad_id INT NULL,                                   -- entidad (cliente/cooperativa) que remite el proceso
     estado VARCHAR(30) NOT NULL DEFAULT 'creado',          -- valores: creado, archivos_cargados, en_analisis, analizado, validado, completado, error, cancelado
     prioridad INT NOT NULL DEFAULT 5,                      -- 1=máxima, 10=mínima
     creado_por INT NULL,
@@ -149,9 +183,12 @@ CREATE TABLE IF NOT EXISTS procesos (
         REFERENCES control_usuarios(id) ON DELETE SET NULL,
     CONSTRAINT fk_proc_asignado FOREIGN KEY (asignado_a)
         REFERENCES control_usuarios(id) ON DELETE SET NULL,
+    CONSTRAINT fk_proc_entidad FOREIGN KEY (entidad_id)
+        REFERENCES entidades(id) ON DELETE SET NULL,
     INDEX idx_proc_codigo (codigo),
     INDEX idx_proc_estado (estado),
     INDEX idx_proc_tipo (tipo),
+    INDEX idx_proc_entidad (entidad_id),
     INDEX idx_proc_prioridad (prioridad),
     INDEX idx_proc_creado (creado_por),
     INDEX idx_proc_fecha_creado (created_at)
@@ -189,6 +226,8 @@ CREATE TABLE IF NOT EXISTS procesos_datos_ia (
     metadata JSON NULL COMMENT 'tokens_entrada, tokens_salida, modelo, prompts_usados, tiempos',
     modelo VARCHAR(50) NULL,
     tokens_total INT NULL,
+    tokens_entrada INT NULL,
+    tokens_salida INT NULL,
     fecha_analisis TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     validado_por INT NULL,
     fecha_validacion DATETIME NULL,
@@ -519,9 +558,12 @@ INSERT INTO control_usuarios (usuario, password, nombre_completo, email, rol, cl
 ON DUPLICATE KEY UPDATE usuario = usuario;
 
 INSERT INTO app_configuracion (clave, valor, tipo, categoria, descripcion) VALUES
-('gemini_model',              'gemini-1.5-flash', 'string', 'ia',       'Modelo de Gemini a utilizar'),
+('gemini_model',              'gemini-2.5-flash', 'string', 'ia',       'Modelo de Gemini a utilizar'),
 ('gemini_temperature',        '0.1',              'float',  'ia',       'Temperatura para respuestas de IA'),
-('gemini_max_tokens',         '4000',             'int',    'ia',       'Máximo de tokens de salida'),
+('gemini_max_tokens',         '26000',            'int',    'ia',       'Máximo de tokens de salida'),
+('gemini_thinking_budget',    '0',                'int',    'ia',       'Presupuesto de thinking de Gemini 2.5 (0=off, -1=auto, >0=fijo)'),
+('precio_ia_entrada_usd_1m',  '0.30',             'float',  'ia',       'Precio USD por 1M tokens de entrada (prompt)'),
+('precio_ia_salida_usd_1m',   '2.50',             'float',  'ia',       'Precio USD por 1M tokens de salida (respuesta)'),
 ('max_file_size_image',       '5242880',          'int',    'archivos', 'Tamaño máximo imágenes (5MB)'),
 ('max_file_size_pdf',         '10485760',         'int',    'archivos', 'Tamaño máximo PDFs (10MB)'),
 ('max_file_size_html',        '2097152',          'int',    'archivos', 'Tamaño máximo HTML (2MB)'),
@@ -539,3 +581,43 @@ INSERT INTO app_prompts (nombre, version, tipo, contenido, activo, notas) VALUES
 'Analiza estos documentos anexos y extrae la información del deudor y codeudor (si existe).\n\nIMPORTANTE:\n- Responde SOLO con el JSON, sin texto adicional\n- Usa null para campos que no encuentres\n- Identifica si hay información de codeudor/garante\n\nEstructura JSON requerida:\n{\n  "deudor": { "nombre_completo": "string o null", "tipo_documento": "CC/CE/NIT/PA o null", "numero_documento": "string o null", "fecha_expedicion": "YYYY-MM-DD o null", "lugar_expedicion": "string o null", "fecha_nacimiento": "YYYY-MM-DD o null", "direccion": "string o null", "ciudad": "string o null", "departamento": "string o null", "telefono": "string o null", "celular": "string o null", "email": "string o null", "ocupacion": "string o null", "empresa": "string o null", "cargo": "string o null", "ingresos_mensuales": "number o null" },\n  "codeudor": { "existe": "boolean", "nombre_completo": "string o null", "tipo_documento": "string o null", "numero_documento": "string o null", "fecha_expedicion": "string o null", "lugar_expedicion": "string o null", "direccion": "string o null", "ciudad": "string o null", "departamento": "string o null", "telefono": "string o null", "celular": "string o null", "email": "string o null", "relacion_deudor": "string o null" },\n  "referencias": [ { "nombre": "string", "telefono": "string", "relacion": "string" } ],\n  "solicitudes_vinculacion": { "detectadas": "boolean", "paginas": ["number"] }\n}',
 1, 'Prompt inicial migrado de bybot_app/legacy gemini_client.py')
 ON DUPLICATE KEY UPDATE contenido = VALUES(contenido);
+
+-- ---------------------------------------------------------------------------
+-- Seeds F4: entidades + catálogo de documentos + prompts (foco CONFIAR)
+-- (definición completa y comentada en sql/migrations/f4_entidades.sql)
+-- ---------------------------------------------------------------------------
+INSERT INTO entidades (codigo, nombre, nit, activo) VALUES
+    ('confiar',   'CONFIAR Cooperativa Financiera',          '890900841', 1),
+    ('crearcoop', 'Cooperativa de Ahorro y Crédito CREAR',   '890981459', 1),
+    ('somec',     'Cooperativa Multiactiva de Profesionales SOMEC', '860026153', 1)
+ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), nit = VALUES(nit);
+
+INSERT INTO entidades_tipos_doc (entidad_id, clave, label, categoria_logica, obligatorio, orden)
+SELECT e.id, v.clave, v.label, v.categoria_logica, v.obligatorio, v.orden
+FROM entidades e
+JOIN (
+    SELECT 'extracto'    AS clave, 'Extracto de crédito'         AS label, 'estado_cuenta' AS categoria_logica, 1 AS obligatorio, 1 AS orden
+    UNION ALL SELECT 'amortizacion', 'Tabla de amortización',    'amortizacion', 1, 2
+    UNION ALL SELECT 'pagare',       'Pagaré',                   'pagare',       1, 3
+    UNION ALL SELECT 'vinculacion',  'Solicitud de vinculación', 'vinculacion',  1, 4
+) v
+WHERE e.codigo = 'confiar'
+ON DUPLICATE KEY UPDATE label = VALUES(label), clave = VALUES(clave),
+    obligatorio = VALUES(obligatorio), orden = VALUES(orden);
+
+-- Prompts específicos de CONFIAR (uno por categoría). Devuelven JSON canónico.
+INSERT INTO app_prompts (nombre, version, tipo, entidad_id, contenido, activo, notas)
+SELECT p.nombre, 'v1', p.tipo, e.id, p.contenido, 1, 'Prompt CONFIAR (F4)'
+FROM entidades e
+JOIN (
+    SELECT 'confiar_estado_cuenta' AS nombre, 'estado_cuenta' AS tipo,
+'Eres un extractor de datos de documentos financieros de CONFIAR Cooperativa Financiera. Este documento es un EXTRACTO DE CRÉDITO.\n\nIMPORTANTE:\n- Responde SOLO con JSON válido, sin texto adicional ni markdown.\n- Usa null para lo que no encuentres. Montos como números sin símbolos ni separadores. Tasas como decimal (14.75).\n\nEstructura JSON:\n{\n  "credito": { "numero_pagare": "string o null", "producto": "string o null", "monto": "number o null", "cuota": "number o null", "plazo_meses": "number o null", "tasa_ea": "number o null", "fecha_desembolso": "YYYY-MM-DD o null", "cuotas_pagadas": "number o null", "cuotas_pendientes": "number o null", "proximo_pago": "YYYY-MM-DD o null" },\n  "estado_cuenta": { "capital": "number o null", "intereses_corrientes": "number o null", "intereses_mora": "number o null", "total_deuda": "number o null", "fecha_corte": "YYYY-MM-DD o null" },\n  "deudor": { "nombre_completo": "string o null", "tipo_documento": "CC/CE/NIT/PA o null", "numero_documento": "string o null", "direccion": "string o null", "municipio": "string o null" },\n  "entidad": { "nombre": "CONFIAR Cooperativa Financiera", "nit": "string o null" },\n  "observaciones": "string o null"\n}' AS contenido
+    UNION ALL SELECT 'confiar_amortizacion', 'amortizacion',
+'Eres un extractor de datos de CONFIAR Cooperativa Financiera. Este documento es una TABLA DE AMORTIZACIÓN / plan de pagos.\n\nIMPORTANTE:\n- Responde SOLO con JSON válido, sin texto adicional ni markdown.\n- Montos como números sin símbolos. Usa null para lo que no encuentres.\n- En "cuotas" incluye hasta las primeras 60 filas si hay muchas.\n\nEstructura JSON:\n{\n  "amortizacion": { "valor_cuota": "number o null", "numero_cuotas": "number o null", "cuotas": [ { "numero": "number", "fecha": "YYYY-MM-DD o null", "cuota": "number o null", "abono_capital": "number o null", "abono_interes": "number o null", "saldo": "number o null" } ] },\n  "observaciones": "string o null"\n}'
+    UNION ALL SELECT 'confiar_pagare', 'pagare',
+'Eres un extractor de datos de CONFIAR Cooperativa Financiera. Este documento es un PAGARÉ (puede estar escaneado; usa OCR visual).\n\nIMPORTANTE:\n- Responde SOLO con JSON válido, sin texto adicional ni markdown.\n- Montos como números sin símbolos. Usa null para lo que no encuentres.\n\nEstructura JSON:\n{\n  "pagare": { "numero": "string o null", "valor": "number o null", "fecha_suscripcion": "YYYY-MM-DD o null", "vencimiento": "YYYY-MM-DD o null", "tasa_interes": "number o null", "ciudad": "string o null" },\n  "deudor": { "nombre_completo": "string o null", "tipo_documento": "CC/CE/NIT/PA o null", "numero_documento": "string o null" },\n  "codeudor": { "existe": "boolean", "nombre_completo": "string o null", "tipo_documento": "string o null", "numero_documento": "string o null" },\n  "observaciones": "string o null"\n}'
+    UNION ALL SELECT 'confiar_vinculacion', 'vinculacion',
+'Eres un extractor de datos de CONFIAR Cooperativa Financiera. Este documento es una SOLICITUD DE VINCULACIÓN / formulario del asociado.\n\nIMPORTANTE:\n- Responde SOLO con JSON válido, sin texto adicional ni markdown.\n- Usa null para lo que no encuentres.\n\nEstructura JSON:\n{\n  "deudor": { "nombre_completo": "string o null", "tipo_documento": "CC/CE/NIT/PA o null", "numero_documento": "string o null", "fecha_expedicion": "YYYY-MM-DD o null", "lugar_expedicion": "string o null", "fecha_nacimiento": "YYYY-MM-DD o null", "direccion": "string o null", "ciudad": "string o null", "departamento": "string o null", "telefono": "string o null", "celular": "string o null", "email": "string o null", "ocupacion": "string o null", "empresa": "string o null", "ingresos_mensuales": "number o null" },\n  "codeudor": { "existe": "boolean", "nombre_completo": "string o null", "tipo_documento": "string o null", "numero_documento": "string o null", "direccion": "string o null", "ciudad": "string o null", "telefono": "string o null", "celular": "string o null", "relacion_deudor": "string o null" },\n  "referencias": [ { "nombre": "string", "telefono": "string", "relacion": "string" } ],\n  "observaciones": "string o null"\n}'
+) p
+WHERE e.codigo = 'confiar'
+ON DUPLICATE KEY UPDATE contenido = VALUES(contenido), activo = 1;

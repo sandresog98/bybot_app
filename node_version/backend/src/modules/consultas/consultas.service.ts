@@ -68,6 +68,7 @@ export async function encolarConsultas(
     bot: string;
     numero_id: string;
     estado: string;
+    orden_ejecucion: number;
   }> = [];
 
   for (const persona of personas) {
@@ -92,6 +93,7 @@ export async function encolarConsultas(
         bot,
         numero_id: persona.numero_id,
         estado: 'pendiente',
+        orden_ejecucion: pc.orden_ejecucion,
       });
     }
   }

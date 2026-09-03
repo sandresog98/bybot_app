@@ -1,10 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { extname } from 'node:path';
 import { prisma } from '../../core/db.js';
 import { store, read, remove } from '../../core/storageClient.js';
 import { auditProceso } from '../../core/audit.js';
 import { env } from '../../config/env.js';
 import { badRequest, notFound } from '../../core/errors.js';
+import { getCategoriasValidas } from '../entidades/entidades.service.js';
+import { ARCHIVO_TIPOS } from './archivos.schema.js';
 import type { ArchivoTipo } from './archivos.schema.js';
 
 class HttpConflictError extends Error {
@@ -12,15 +13,31 @@ class HttpConflictError extends Error {
   constructor(msg: string) { super(msg); }
 }
 
-// MIME -> extensión por defecto si no viene nombre original
+// MIME -> extensión canónica. La extensión SIEMPRE se deriva del MIME validado
+// (nunca del nombre de archivo del usuario) para blindar contra path traversal.
 const MIME_TO_EXT: Record<string, string> = {
   'application/pdf': '.pdf',
   'image/jpeg': '.jpg',
   'image/png': '.png',
+  'image/tiff': '.tif',
   'text/html': '.html',
   'application/vnd.ms-excel': '.xls',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
 };
+
+/**
+ * Detecta el MIME real por firma (magic bytes) para los formatos binarios que
+ * manejamos. No se confía en el Content-Type del cliente (anti-spoofing).
+ * Devuelve null si no hay firma reconocible (html/excel se validan por MIME declarado).
+ */
+function sniffMime(buf: Buffer): string | null {
+  if (buf.length >= 4 && buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46) return 'application/pdf'; // %PDF
+  if (buf.length >= 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'image/png';
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
+  if (buf.length >= 4 && ((buf[0] === 0x49 && buf[1] === 0x49 && buf[2] === 0x2a && buf[3] === 0x00) ||
+                          (buf[0] === 0x4d && buf[1] === 0x4d && buf[2] === 0x00 && buf[3] === 0x2a))) return 'image/tiff';
+  return null;
+}
 
 // MIME -> límite de tamaño correcto
 function limitForMime(mime: string): number | null {
@@ -36,6 +53,19 @@ function limitForMime(mime: string): number | null {
 function isMimeAllowed(mime: string): boolean {
   const allowed = env.UPLOAD_ALLOWED_MIMES.split(',').map((s) => s.trim().toLowerCase());
   return allowed.includes(mime.toLowerCase());
+}
+
+/**
+ * Valida que `tipo` sea una categoría lógica permitida para el proceso:
+ * - Si el proceso tiene entidad → contra el catálogo de esa entidad.
+ * - Si no → contra la whitelist global ARCHIVO_TIPOS.
+ */
+async function assertTipoValido(procesoId: number, tipo: string): Promise<void> {
+  const catalogo = await getCategoriasValidas(procesoId);
+  const permitidos = catalogo ?? new Set<string>(ARCHIVO_TIPOS);
+  if (!permitidos.has(tipo)) {
+    throw badRequest(`Tipo de documento no válido para este proceso: ${tipo}`);
+  }
 }
 
 export interface UploadResult {
@@ -59,11 +89,24 @@ export async function uploadArchivo(
   const proc = await prisma.proceso.findUnique({ where: { id: procesoId }, select: { id: true, codigo: true, estado: true } });
   if (!proc) throw notFound('Proceso no encontrado');
 
-  // 2. Validar mime
-  const mime = file.mimetype.toLowerCase();
-  if (!isMimeAllowed(mime)) throw badRequest(`Tipo de archivo no permitido: ${mime}`);
+  // 2. Validar que el tipo pertenezca al proceso (catálogo de la entidad o whitelist global)
+  await assertTipoValido(procesoId, tipo);
 
-  // 3. Validar tamaño
+  // 3. Determinar el MIME real por firma (anti-spoofing). Para binarios manda la firma;
+  //    si no hay firma reconocible (html/excel) se usa el MIME declarado.
+  const declared = file.mimetype.toLowerCase();
+  const sniffed = sniffMime(file.data);
+  const mime = sniffed ?? declared;
+  if (!isMimeAllowed(mime)) throw badRequest(`Tipo de archivo no permitido: ${mime}`);
+  // Anti-spoofing: solo se rechaza cuando el cliente DECLARA un tipo concreto que
+  // contradice la firma real. Un Content-Type genérico/desconocido (octet-stream o
+  // vacío) no es una afirmación falsa → manda la firma.
+  const declaredGeneric = !declared || declared === 'application/octet-stream';
+  if (sniffed && !declaredGeneric && declared !== sniffed && !(declared.startsWith('image/') && sniffed.startsWith('image/'))) {
+    throw badRequest(`El contenido del archivo (${sniffed}) no coincide con el tipo declarado (${declared}).`);
+  }
+
+  // 4. Validar tamaño
   const limit = limitForMime(mime);
   if (!limit) throw badRequest(`Tipo no gestionado: ${mime}`);
   if (file.size > limit) {
@@ -71,15 +114,16 @@ export async function uploadArchivo(
     throw badRequest(`El archivo excede el tamaño máximo (${mb} MB) para ${mime}.`);
   }
 
-  // 4. Calcular hash
+  // 5. Calcular hash
   const hash = createHash('sha256').update(file.data).digest('hex');
 
-  // 5. Dedup por hash dentro del proceso
+  // 6. Dedup por hash dentro del proceso
   const dup = await prisma.procesoArchivo.findFirst({ where: { proceso_id: procesoId, hash_sha256: hash } });
   if (dup) throw new HttpConflictError(`El archivo "${file.filename}" ya fue subido a este proceso (mismo contenido, hash SHA-256 idéntico).`);
 
-  // 6. Renombrar: {tipo}_{codigoProceso}_{uuid}.{ext}
-  const ext = extname(file.filename) || MIME_TO_EXT[mime] || '';
+  // 7. Renombrar: {tipo}_{codigoProceso}_{uuid}.{ext}. La extensión se deriva del
+  //    MIME validado (no del nombre de usuario) → sin path traversal en la clave.
+  const ext = MIME_TO_EXT[mime] ?? '.bin';
   const nombreArchivo = `${tipo}_${proc.codigo}_${randomUUID()}${ext}`;
 
   // 7. Guardar en botstorage

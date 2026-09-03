@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { ok, err, badRequest, notFound, forbidden } from '../../core/errors.js';
+import { ok, err, badRequest, forbidden } from '../../core/errors.js';
 import * as svc from './prompts.service.js';
 import { createPromptSchema, updatePromptSchema } from './prompts.schema.js';
 

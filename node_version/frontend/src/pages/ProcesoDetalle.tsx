@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, type DragEvent } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { useProceso, useUpdateProceso, useAsignables, useUploadArchivo, useDeleteArchivo, fetchArchivoBlob, useAnalizarProceso, useAnalisisEstado, useAnalisisDatos, useValidarProceso, useConsultarProceso, useConsultasProceso } from '../api/queries';
+import { useProceso, useUpdateProceso, useAsignables, useUploadArchivo, useDeleteArchivo, fetchArchivoBlob, useAnalizarProceso, useAnalisisEstado, useAnalisisDatos, useConsumoProceso, useValidarProceso, useConsultarProceso, useConsultasProceso, useEntidadTiposDoc } from '../api/queries';
 import { useAuth } from '../auth/useAuth';
 import { estadoColor, formatDate, formatBytes, iconForMime } from '../components/format';
 import ValidacionForm from '../components/ValidacionForm';
@@ -10,14 +10,18 @@ import ConsultasResult from '../components/ConsultasResult';
 import type { ProcesoEstado } from '../api/types';
 
 const ESTADOS: ProcesoEstado[] = ['creado', 'archivos_cargados', 'en_analisis', 'analizado', 'validado', 'completado', 'error', 'cancelado'];
-const ARCHIVO_TIPOS = [
+// Fallback global cuando el proceso no tiene entidad (los tipos por entidad vienen del backend).
+const ARCHIVO_TIPOS_GLOBAL = [
   { value: 'estado_cuenta', label: 'Estado de cuenta' },
   { value: 'anexo', label: 'Anexo' },
-  { value: 'solicitud_deudor', label: 'Solicitud del deudor' },
-  { value: 'solicitud_codeudor', label: 'Solicitud del codeudor' },
+  { value: 'pagare', label: 'Pagaré' },
+  { value: 'amortizacion', label: 'Amortización' },
+  { value: 'vinculacion', label: 'Vinculación' },
   { value: 'identificacion', label: 'Identificación' },
   { value: 'otro', label: 'Otro' },
 ];
+// Formatos aceptados por el input de archivos (incluye TIFF).
+const ACCEPT_FILES = '.pdf,.jpg,.jpeg,.png,.tif,.tiff,.html,.xls,.xlsx';
 
 interface UploadTask {
   file: File;
@@ -34,6 +38,7 @@ export default function ProcesoDetalle() {
   const tokenValid = !!user;
 
   const { data: proc, isLoading, error } = useProceso(procesoId, tokenValid);
+  const { data: tiposEntidad } = useEntidadTiposDoc(proc?.entidad_id ?? null, tokenValid);
   const updateMut = useUpdateProceso();
   const deleteArchivoMut = useDeleteArchivo(procesoId ?? 0);
   const { data: asignables } = useAsignables(tokenValid);
@@ -43,6 +48,7 @@ export default function ProcesoDetalle() {
   const { data: estadoAnalisis } = useAnalisisEstado(procesoId, pollActive);
   const showDatosIa = !!proc && (proc.estado === 'analizado' || proc.estado === 'validado');
   const { data: analisisDatos } = useAnalisisDatos(procesoId, showDatosIa);
+  const { data: consumoIa } = useConsumoProceso(procesoId, showDatosIa);
   const validarMut = useValidarProceso();
   const queryClient = useQueryClient();
 
@@ -72,9 +78,21 @@ export default function ProcesoDetalle() {
   }, [estadoAnalisis, queryClient, procesoId]);
 
   const [tasks, setTasks] = useState<UploadTask[]>([]);
-  const [defaultTipo, setDefaultTipo] = useState('anexo');
+  const [defaultTipo, setDefaultTipo] = useState('otro');
   const [dragover, setDragover] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  // Tipos de documento a ofrecer: los de la entidad del proceso si existen; si no, el fallback global.
+  const tiposDoc = (tiposEntidad && tiposEntidad.length > 0)
+    ? tiposEntidad.map((t) => ({ value: t.value, label: t.label }))
+    : ARCHIVO_TIPOS_GLOBAL;
+
+  // Cuando llegan los tipos, fijar el valor por defecto al primero disponible.
+  useEffect(() => {
+    if (tiposDoc.length > 0 && !tiposDoc.some((t) => t.value === defaultTipo)) {
+      setDefaultTipo(tiposDoc[0].value);
+    }
+  }, [tiposDoc, defaultTipo]);
 
   // previewId state removed (usando links directos)
 
@@ -223,10 +241,23 @@ export default function ProcesoDetalle() {
             <h3 className="h6 mb-3" style={{ fontFamily: 'var(--by-fuente-titulo)', color: 'var(--by-azul)' }}>
               <i className="bi bi-cloud-upload" /> Archivos
             </h3>
+            {proc.entidad && tiposEntidad && tiposEntidad.length > 0 && (
+              <div className="alert alert-light border small mb-2 py-2">
+                <strong>Documentos esperados de {proc.entidad}:</strong>{' '}
+                {tiposEntidad.map((t) => {
+                  const cargado = proc.archivos.some((a) => a.tipo === t.value);
+                  return (
+                    <span key={t.value} className={`badge me-1 ${cargado ? 'bg-success' : (t.obligatorio ? 'bg-secondary' : 'bg-light text-secondary')}`}>
+                      {cargado ? '✓ ' : ''}{t.label}{t.obligatorio && !cargado ? ' *' : ''}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
             <div className="mb-2">
               <label className="form-label small me-2">Tipo por defecto al arrastrar:</label>
               <select className="form-select form-select-sm d-inline-block" style={{ width: 'auto' }} value={defaultTipo} onChange={(e) => setDefaultTipo(e.target.value)}>
-                {ARCHIVO_TIPOS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                {tiposDoc.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
             <div
@@ -239,8 +270,8 @@ export default function ProcesoDetalle() {
             >
               <i className="bi bi-cloud-arrow-up fs-1 d-block mb-2" />
               <strong>Arrastra archivos aquí o haz clic para seleccionar</strong>
-              <br /><span className="small text-muted">PDF, JPG, PNG, HTML, Excel · Multi-archivo</span>
-              <input ref={fileInput} type="file" multiple className="d-none" onChange={onSelectChange} />
+              <br /><span className="small text-muted">PDF, JPG, PNG, TIFF, HTML, Excel · Multi-archivo</span>
+              <input ref={fileInput} type="file" multiple accept={ACCEPT_FILES} className="d-none" onChange={onSelectChange} />
             </div>
 
             {/* Cola de subidas */}
@@ -292,6 +323,22 @@ export default function ProcesoDetalle() {
               </table>
             )}
           </div>
+
+          {/* Consumo IA (tokens + costo estimado del proceso) */}
+          {showDatosIa && consumoIa && consumoIa.analisis_count > 0 && (
+            <div className="page-card mt-3">
+              <div className="d-flex flex-wrap align-items-center gap-3">
+                <span className="fw-semibold" style={{ color: 'var(--by-azul)' }}><i className="bi bi-cpu me-1" /> Consumo IA</span>
+                {analisisDatos?.modelo && <span className="badge bg-light text-secondary">{analisisDatos.modelo}</span>}
+                <span className="small text-muted">Entrada: <strong>{consumoIa.tokens_entrada.toLocaleString()}</strong> tok</span>
+                <span className="small text-muted">Salida: <strong>{consumoIa.tokens_salida.toLocaleString()}</strong> tok</span>
+                <span className="small text-muted">Total: <strong>{consumoIa.tokens_total.toLocaleString()}</strong> tok</span>
+                <span className="ms-auto badge bg-success" title={`${consumoIa.analisis_count} análisis · $${consumoIa.precios.entrada}/$${consumoIa.precios.salida} por 1M`}>
+                  ≈ US${consumoIa.costo_estimado_usd.toFixed(4)}
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Validación IA */}
           {showDatosIa && analisisDatos && (

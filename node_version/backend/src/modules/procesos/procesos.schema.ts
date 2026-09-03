@@ -14,6 +14,7 @@ export const PROCESO_ESTADOS = [
 
 export const createProcesoSchema = z.object({
   tipo: z.enum(PROCESO_TIPOS).default('cobranza'),
+  entidad_id: z.number().int().positive().optional(),
   prioridad: z.number().int().min(1).max(10).default(5),
   notas: z.string().max(5000).optional(),
   asignado_a: z.number().int().positive().optional(),

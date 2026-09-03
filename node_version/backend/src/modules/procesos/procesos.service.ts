@@ -1,5 +1,7 @@
 import { prisma } from '../../core/db.js';
 import { auditProceso } from '../../core/audit.js';
+import { badRequest } from '../../core/errors.js';
+import { entidadActivaExiste } from '../entidades/entidades.service.js';
 import type { CreateProcesoInput, UpdateProcesoInput, ListProcesosInput } from './procesos.schema.js';
 
 /**
@@ -25,17 +27,22 @@ async function generateCodigo(): Promise<string> {
 }
 
 export async function createProceso(data: CreateProcesoInput, usuarioId: number) {
+  // Validar la entidad contra fuente confiable (whitelist en BD) antes de asociarla.
+  if (data.entidad_id != null && !(await entidadActivaExiste(data.entidad_id))) {
+    throw badRequest('Entidad inválida o inactiva.');
+  }
   const codigo = await generateCodigo();
   const proc = await prisma.proceso.create({
     data: {
       codigo,
       tipo: data.tipo,
+      entidad_id: data.entidad_id ?? null,
       prioridad: data.prioridad,
       notas: data.notas,
       asignado_a: data.asignado_a ?? null,
       creado_por: usuarioId,
     },
-    include: { _count: { select: { archivos: true } } },
+    include: { _count: { select: { archivos: true } }, entidad: { select: { id: true, nombre: true, codigo: true } } },
   });
   await auditProceso(proc.id, usuarioId, 'creado', {
     estado_nuevo: 'creado',
@@ -60,6 +67,7 @@ export async function listProcesos(opts: ListProcesosInput) {
         _count: { select: { archivos: true } },
         creado_por_user: { select: { nombre_completo: true } },
         asignado_a_user: { select: { nombre_completo: true } },
+        entidad: { select: { id: true, nombre: true, codigo: true } },
       },
     }),
     prisma.proceso.count({ where }),
@@ -72,6 +80,7 @@ export async function getProceso(id: number) {
     where: { id },
     include: {
       archivos: { orderBy: { orden: 'asc' } },
+      entidad: { select: { id: true, nombre: true, codigo: true } },
       creado_por_user: { select: { id: true, nombre_completo: true } },
       asignado_a_user: { select: { id: true, nombre_completo: true } },
       historial: {

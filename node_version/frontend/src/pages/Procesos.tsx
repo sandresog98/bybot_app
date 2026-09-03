@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { useProcesos, useCreateProceso } from '../api/queries';
+import { useProcesos, useCreateProceso, useEntidades } from '../api/queries';
 import { useAuth } from '../auth/useAuth';
 import { estadoColor, formatDateShort } from '../components/format';
 import Modal from '../components/Modal';
@@ -17,18 +17,26 @@ export default function Procesos() {
   const params = { page, limit: 15, estado: estado || undefined, tipo: tipo || undefined, q: q || undefined };
   const { data, isLoading, error } = useProcesos(params, tokenValid);
   const createMut = useCreateProceso();
+  const { data: entidades } = useEntidades(tokenValid);
   const [newTipo, setNewTipo] = useState('cobranza');
+  const [newEntidad, setNewEntidad] = useState('');
   const [newPrioridad, setNewPrioridad] = useState(5);
   const [newNotas, setNewNotas] = useState('');
 
   const onCrear = async (e: FormEvent) => {
     e.preventDefault();
     try {
-      await createMut.mutateAsync({ tipo: newTipo, prioridad: newPrioridad, notas: newNotas });
+      await createMut.mutateAsync({
+        tipo: newTipo,
+        entidad_id: newEntidad ? Number(newEntidad) : undefined,
+        prioridad: newPrioridad,
+        notas: newNotas,
+      });
       setShowNew(false);
       setNewNotas('');
       setNewPrioridad(5);
       setNewTipo('cobranza');
+      setNewEntidad('');
     } catch { /* ignore */ }
   };
 
@@ -78,14 +86,15 @@ export default function Procesos() {
 
         <table className="table table-sm align-middle">
           <thead>
-            <tr><th>Código</th><th>Estado</th><th>Tipo</th><th>Prioridad</th><th>Archivos</th><th>Asignado</th><th>Creado</th></tr>
+            <tr><th>Código</th><th>Entidad</th><th>Estado</th><th>Tipo</th><th>Prioridad</th><th>Archivos</th><th>Asignado</th><th>Creado</th></tr>
           </thead>
           <tbody>
-            {isLoading && <tr><td colSpan={7} className="text-center text-muted py-3">Cargando…</td></tr>}
-            {!isLoading && data?.rows.length === 0 && <tr><td colSpan={7} className="text-center text-muted py-3">Sin resultados.</td></tr>}
+            {isLoading && <tr><td colSpan={8} className="text-center text-muted py-3">Cargando…</td></tr>}
+            {!isLoading && data?.rows.length === 0 && <tr><td colSpan={8} className="text-center text-muted py-3">Sin resultados.</td></tr>}
             {data?.rows.map((p) => (
               <tr key={p.id}>
                 <td><Link to={`/procesos/${p.id}`}><code>{p.codigo}</code></Link></td>
+                <td className="text-muted small">{p.entidad ?? '—'}</td>
                 <td><span className={`badge bg-${estadoColor(p.estado)}`}>{p.estado.replace(/_/g, ' ')}</span></td>
                 <td className="text-muted">{p.tipo}</td>
                 <td>{p.prioridad}</td>
@@ -122,6 +131,16 @@ export default function Procesos() {
         }
       >
         <form id="form-new-proceso" onSubmit={onCrear}>
+          <div className="mb-3">
+            <label className="form-label">Entidad (cliente)</label>
+            <select className="form-select" value={newEntidad} onChange={(e) => setNewEntidad(e.target.value)}>
+              <option value="">— Sin entidad —</option>
+              {entidades?.map((en) => (
+                <option key={en.id} value={en.id}>{en.nombre}</option>
+              ))}
+            </select>
+            <div className="form-text">Define qué documentos se esperan y qué prompts usa el análisis.</div>
+          </div>
           <div className="mb-3">
             <label className="form-label">Tipo de proceso</label>
             <select className="form-select" value={newTipo} onChange={(e) => setNewTipo(e.target.value)}>
