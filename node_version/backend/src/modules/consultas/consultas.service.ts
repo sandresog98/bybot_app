@@ -3,7 +3,7 @@ import { push } from '../../core/queue.js';
 import { auditProceso } from '../../core/audit.js';
 import { notFound, badRequest } from '../../core/errors.js';
 
-const BOTS_POR_DEFECTO = ['fosiga', 'ruaf', 'rues'];
+const BOTS_POR_DEFECTO = ['fosiga', 'ruaf', 'rues', 'simpleco'];
 
 interface Persona {
   tipo: string;
@@ -49,11 +49,16 @@ export async function encolarConsultas(
   const deudor = dv.deudor as Record<string, unknown> | undefined;
   const codeudor = dv.codeudor as Record<string, unknown> | undefined;
 
-  if (deudor?.numero_id) {
-    personas.push({ tipo: 'deudor', numero_id: String(deudor.numero_id), nombre: String(deudor.nombre ?? '') });
+  const numeroDe = (p: Record<string, unknown> | undefined) =>
+    p ? String(p.numero_documento ?? p.numero_id ?? '') : '';
+  const nombreDe = (p: Record<string, unknown> | undefined) =>
+    p ? String(p.nombre_completo ?? p.nombre ?? '') : '';
+
+  if (numeroDe(deudor)) {
+    personas.push({ tipo: 'deudor', numero_id: numeroDe(deudor), nombre: nombreDe(deudor) });
   }
-  if (codeudor?.numero_id) {
-    personas.push({ tipo: 'codeudor', numero_id: String(codeudor.numero_id), nombre: String(codeudor.nombre ?? '') });
+  if (numeroDe(codeudor)) {
+    personas.push({ tipo: 'codeudor', numero_id: numeroDe(codeudor), nombre: nombreDe(codeudor) });
   }
 
   if (personas.length === 0) throw badRequest('No se encontraron deudor/codeudor con número de identificación en los datos validados.');
@@ -141,6 +146,8 @@ export async function getConsultaDetalle(consultaId: number) {
     datos = await prisma.ruafConsulta.findUnique({ where: { id: pc.consulta_id } });
   } else if (pc.consulta_tabla === 'rues_consultas') {
     datos = await prisma.ruesConsulta.findUnique({ where: { id: pc.consulta_id } });
+  } else if (pc.consulta_tabla === 'simpleco_consultas') {
+    datos = await prisma.simplecoConsulta.findUnique({ where: { id: pc.consulta_id } });
   }
 
   return { ...pc, datos };

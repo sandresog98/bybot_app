@@ -2,19 +2,30 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from common.timezone_utils import ZONA_BOGOTA
 
 logger = logging.getLogger(__name__)
 
+# Cargar el .env del monorepo (raíz node_version/) para credenciales de BD.
+# bots/common/db.py -> common -> bots -> node_version (3 niveles arriba)
+try:
+    from dotenv import load_dotenv
+    _ROOT = Path(__file__).resolve().parent.parent.parent
+    load_dotenv(_ROOT / ".env")
+except Exception:
+    pass
+
 DB_CONFIG = {
-    "host": "127.0.0.1",
-    "port": 3306,
-    "user": "root",
-    "password": "",
-    "database": "bybot_consolidado",
+    "host": os.getenv("DB_HOST", "127.0.0.1"),
+    "port": int(os.getenv("DB_PORT", "3306")),
+    "user": os.getenv("DB_USER", "root"),
+    "password": os.getenv("DB_PASS", ""),
+    "database": os.getenv("DB_NAME", "bybot_consolidado"),
     "charset": "utf8mb4",
     "autocommit": True,
 }

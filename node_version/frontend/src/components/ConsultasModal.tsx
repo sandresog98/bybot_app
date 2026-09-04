@@ -11,9 +11,10 @@ const BOTS_DISPONIBLES = [
   { id: 'fosiga', label: 'Fosiga (ADRES)', desc: 'Consulta EPS — nombres, apellidos, régimen, estado afiliación' },
   { id: 'ruaf', label: 'RUAF (SISPRO)', desc: 'Afiliación salud — EPS, régimen, estado, fecha afiliación' },
   { id: 'rues', label: 'RUES (Reg. Mercantil)', desc: 'Registro mercantil — razón social, NIT, matrícula, estado' },
+  { id: 'simpleco', label: 'Simple.co (PILA)', desc: 'Comprobante de pago aportes — periodo, empresa, empleado, aportes' },
 ];
 
-const ORDEN_POR_DEFECTO = ['fosiga', 'ruaf', 'rues'];
+const ORDEN_POR_DEFECTO = ['fosiga', 'ruaf', 'rues', 'simpleco'];
 
 export default function ConsultasModal({ personas, onConfirm, onCancel, loading }: Props) {
   const [selectedBots, setSelectedBots] = useState<Set<string>>(new Set(ORDEN_POR_DEFECTO));

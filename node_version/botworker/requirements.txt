@@ -4,3 +4,5 @@
 google-genai>=1.0.0
 python-dotenv>=1.0.0
 mysql-connector-python>=8.3.0
+# Conversión TIFF→PDF que usa shared/documentos.py (obligatorio para archivos .tif)
+Pillow>=10.0.0

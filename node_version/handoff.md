@@ -108,6 +108,46 @@ documentos y —si su layout lo requiere— prompts específicos por categoría.
   `RESOURCE_EXHAUSTED` esperar el reset diario (medianoche PT) o usar key con facturación.
 - Otros: plantilla Excel descargable (regla 4.1) + `openpyxl` en el venv si se procesan `.xlsx`.
 
+**Sesión actual — consultas simpleco (estado)**:
+- Se integró `simpleco` al flujo de consultas y a la UI (labels/colores/selector + badge por estado).
+- **Estados de bot → `procesos_consultas.estado`** (nuevo `_mapear_estado` en `bot_runner.py`):
+  `EXITOSA→exitoso`, `SIN_PAGOS_6_MESES→sin_pagos`, resto→`fallido`. En `ConsultasResult.tsx`
+  hay badge/icono/color propio para `sin_pagos` ("Sin pagos en los últimos 6 meses").
+- **Parser de comprobante PILA**: `bots/simpleco/parser.py` (pdfplumber) extrae empresa+NIT,
+  empleado+cédula, periodo, tipo_admin/EPS, código/NIT/nombre de la entidad y administradoras;
+  se persiste en `simpleco_consultas` (columnas detalles + `metadata_json`) desde `service.py`.
+  Validado contra un PDF real de SuAporte (misma estructura PILA) → extrae todo.
+- **Fixes de BD críticos**: `bots/common/db.py` y `bots/common/storage.py` ahora leen credenciales
+  `DB_*` del `.env` (antes hardcodeadas / `BYBOT_DB_*` inexistentes). Se creó la tabla
+  `procesos_consultas` (migración `sql/f3_procesos_consultas.sql`) que faltaba, y el modelo
+  Prisma `SimplecoConsulta`.
+- **Fix de mapeo de datos**: `encolarConsultas` ahora acepta `deudor/codeudor.numero_documento|numero_id`
+  y `nombre_completo|nombre` (antes solo `numero_id`/`nombre`, rompía el flujo).
+- **PENDIENTE / no validado**: **no se logró un `EXITOSA` real** de simple.co (bloqueo de seguridad
+  intermitente; se obtuvieron `SIN_PAGOS_6_MESES` y `ERROR_SEGURIDAD`). El parser quedó **sin validar
+  sobre un comprobante real de Simple.co** (validado contra la estructura SuAporte/PILA). Para validar
+  end-to-end (PDF→datos→front) hace falta una corrida `EXITOSA` (cuando simple.co deje pasar y el
+  deudor tenga pagos en el periodo) — reintentar con los CC ya conocidos o uno con afiliación activa.
+- Nota: `BOTS_POR_DEFECTO` en backend ahora incluye `simpleco`; en `app_configuracion`,
+  `bot_order=["simpleco"]`.
+
+**Completitud de datos IA (estado de cuenta / tablas) — sesión**: al reanalizar PROC-2 (crearcoop),
+la cuota free-tier de Gemini (RPD) hizo que categorías cayeran con 429/503 al azar. Cambios:
+- **`getResultados` (backend `analisis.service.ts`) ahora FUSIONA todas las corridas** por clave de
+  categoría (gana la más reciente) y suma tokens/costo. Así un re-análisis parcial NO reemplaza lo
+  ya extraído (antes rompía el conjunto: solo se mostraba la última versión). `datos_validados` se toma
+  de la corrida más reciente que haya sido validada.
+- Aplicada **`sql/migrations/f4f_crearcoop_estado_cuenta.sql`** (prompt específico crearcoop: extrae la
+  tabla `movimientos` + `total_deuda` calculado + `asociado`/`deudor`). El front ya renderiza arrays de
+  objetos como tabla (`ValidacionForm`), así que `movimientos` aparecerá sin código nuevo.
+- **PROC-2 actual**: `validado`, con `deudor` (40418092 MAGNOLIA ROCIO BUENO CHAMBO → ya sirve para bots),
+  `pagare`, `codeudor`, `entidad`, `observaciones`, y `estado_cuenta` (genérico de corrida previa).
+  **PENDIENTE**: la tabla `movimientos` del estado de cuenta (prompt f4f) aún NO se capturó — el re-análisis
+  de estado_cuenta cayó por cuota Gemini agotada. **Re-analizar PROC-2 tras el reset diario de quota
+  (medianoche PT)** para obtener `movimientos` + `total_deuda`; la fusión garantiza que se sume, no que reemplace.
+- **PROC-3 (somec)**: completo (amortización 48 cuotas, deudor, pagare, poder, referencias). No se
+  re-ejecutó (ya estaba completo y la cuota está agotada; no aporta).
+
 ---
 
 ## 2. Arquitectura de bots (cómo fluye una consulta)

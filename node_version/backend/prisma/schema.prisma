@@ -406,3 +406,33 @@ model RuesConsulta {
   @@index([numero_id], name: "idx_rues_numero")
   @@map("rues_consultas")
 }
+
+model SimplecoConsulta {
+  id                      Int      @id @default(autoincrement())
+  numero_id               String   @db.VarChar(50)
+  fecha_consulta          DateTime @db.DateTime
+  estado                  String   @db.VarChar(30)
+  motivo                  String?  @db.VarChar(500)
+  archivo_original        String?  @db.VarChar(600)
+  periodo_mes             Int?
+  periodo_anio            Int?
+  tipo_planilla           String?  @db.VarChar(10)
+  numero_planilla         String?  @db.VarChar(30)
+  periodo_cotizacion      String?  @db.VarChar(10)
+  periodo_servicio        String?  @db.VarChar(10)
+  fecha_comprobante       String?  @db.VarChar(20)
+  empresa                 String?  @db.VarChar(200)
+  documento_identificacion String? @db.VarChar(30)
+  empleado                String?  @db.VarChar(150)
+  cedula                  String?  @db.VarChar(20)
+  tipo_admin              String?  @db.VarChar(80)
+  nit_entidad             String?  @db.VarChar(30)
+  codigo_entidad          String?  @db.VarChar(30)
+  nombre_entidad          String?  @db.VarChar(150)
+  metadata_json           Json?
+  created_at              DateTime @default(now())
+  updated_at              DateTime @default(now()) @updatedAt
+
+  @@index([numero_id], name: "idx_simpleco_numero")
+  @@map("simpleco_consultas")
+}

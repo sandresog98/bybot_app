@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
-import type { DashboardStats, User, Proceso, ProcesoDetalle, Usuario, UsuarioCreado, Prompt, AnalisisDatos, ConsumoIa, ProcesosConsulta, Entidad, EntidadAdmin, EntidadTipoDoc, EntidadTipoDocFull } from './types';
+import type { DashboardStats, User, Proceso, ProcesoDetalle, Usuario, UsuarioCreado, Prompt, AnalisisDatos, ConsumoIa, ProcesosConsulta, ConsultaDetalle, Entidad, EntidadAdmin, EntidadTipoDoc, EntidadTipoDocFull } from './types';
 
 export async function login(usuario: string, password: string) {
   const r = await api.post('/auth/login', { usuario, password });
@@ -457,5 +457,13 @@ export function useConsultasProceso(procesoId: number | null, enabled: boolean) 
       if (d && d.some((c) => c.estado === 'pendiente' || c.estado === 'procesando')) return 3000;
       return false;
     },
+  });
+}
+
+export function useConsultaDetalle(consultaId: number | null, enabled: boolean) {
+  return useQuery<ConsultaDetalle>({
+    queryKey: ['consultaDetalle', consultaId],
+    queryFn: async () => (await api.get(`/consultas/${consultaId}`)).data.data,
+    enabled: enabled && consultaId != null,
   });
 }

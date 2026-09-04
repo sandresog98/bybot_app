@@ -61,17 +61,51 @@ export async function getEstadoTrabajo(procesoId: number) {
   return job;
 }
 
-/** Último resultados_datos_ia del proceso, con costo estimado de esa corrida. */
+/**
+ * Resultados del proceso fusionando TODAS sus corridas de análisis.
+ * Al reanalizar (quota Gemini inestable → 429/503 una categoría puede caer),
+ * cada corrida crea una fila nueva. Fusionamos los datos_originales por clave de
+ * categoría (top-level, gana la más reciente) para no perder lo que ya se extrajo,
+ * y sumar tokens/costo agregado entre corridas.
+ */
 export async function getResultados(procesoId: number) {
-  const row = await prisma.procesosDatosIa.findFirst({
+  const rows = await prisma.procesosDatosIa.findMany({
     where: { proceso_id: procesoId },
-    orderBy: { fecha_analisis: 'desc' },
+    orderBy: { fecha_analisis: 'asc' },
   });
-  if (!row) return null;
+  if (rows.length === 0) return null;
+
+  const ultima = rows[rows.length - 1];
+
+  // Fusión de categorías: empieza en la primera corrida y sobre-escribe con las siguientes.
+  const datosMerge: Record<string, unknown> = {};
+  let tokensEntrada = 0;
+  let tokensSalida = 0;
+  for (const r of rows) {
+    const d = (r.datos_originales ?? {}) as Record<string, unknown>;
+    for (const [k, v] of Object.entries(d)) datosMerge[k] = v;
+    tokensEntrada += r.tokens_entrada ?? 0;
+    tokensSalida += r.tokens_salida ?? 0;
+  }
+
   const precios = await getPreciosIa();
+
+  // datos_validados: el de la corrida más reciente que haya sido validada
+  // (las corridas posteriores por re-análisis no lo contienen).
+  const ultimoValidado = [...rows].reverse().find((r) => r.datos_validados != null) ?? null;
+
   return {
-    ...row,
-    costo_estimado_usd: costoUsd(row.tokens_entrada ?? 0, row.tokens_salida ?? 0, precios),
+    id: ultima.id,
+    proceso_id: ultima.proceso_id,
+    version: ultima.version,
+    datos_originales: datosMerge,
+    datos_validados: ultimoValidado?.datos_validados ?? ultima.datos_validados,
+    modelo: ultima.modelo,
+    tokens_entrada: tokensEntrada,
+    tokens_salida: tokensSalida,
+    tokens_total: tokensEntrada + tokensSalida,
+    fecha_analisis: ultima.fecha_analisis,
+    costo_estimado_usd: costoUsd(tokensEntrada, tokensSalida, precios),
   };
 }
 

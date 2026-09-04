@@ -10,6 +10,15 @@ from typing import Any
 
 from common.timezone_utils import ZONA_BOGOTA
 
+# Cargar el .env del monorepo (raíz node_version/) para credenciales de BD.
+# bots/common/storage.py -> common -> bots -> node_version (3 niveles arriba).
+try:
+    from dotenv import load_dotenv
+    _ROOT = Path(__file__).resolve().parent.parent.parent
+    load_dotenv(_ROOT / ".env")
+except Exception:
+    pass
+
 logger = logging.getLogger(__name__)
 
 CAMPOS_BASE = [
@@ -21,11 +30,11 @@ CAMPOS_BASE = [
 ]
 
 DB_CONFIG = {
-    "host": os.environ.get("BYBOT_DB_HOST", "127.0.0.1"),
-    "port": int(os.environ.get("BYBOT_DB_PORT", "3306")),
-    "user": os.environ.get("BYBOT_DB_USER", "root"),
-    "password": os.environ.get("BYBOT_DB_PASSWORD", ""),
-    "database": os.environ.get("BYBOT_DB_NAME", "bybot_consolidado"),
+    "host": os.environ.get("DB_HOST", os.environ.get("BYBOT_DB_HOST", "127.0.0.1")),
+    "port": int(os.environ.get("DB_PORT", os.environ.get("BYBOT_DB_PORT", "3306"))),
+    "user": os.environ.get("DB_USER", os.environ.get("BYBOT_DB_USER", "root")),
+    "password": os.environ.get("DB_PASS", os.environ.get("BYBOT_DB_PASSWORD", "")),
+    "database": os.environ.get("DB_NAME", os.environ.get("BYBOT_DB_NAME", "bybot_consolidado")),
     "charset": "utf8mb4",
     "autocommit": True,
     "connect_timeout": 5,

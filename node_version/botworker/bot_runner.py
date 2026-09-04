@@ -107,13 +107,25 @@ def actualizar_progreso(consulta_id: int, estado: str, mensaje: str, conn=None):
             conn.close()
 
 
+def _mapear_estado(bot_estado: str) -> str:
+    """Traduce el estado devuelto por un bot a un estado canónico de procesos_consultas."""
+    e = (bot_estado or "").upper()
+    if e == "EXITOSA":
+        return "exitoso"
+    if e in ("SIN_PAGOS_6_MESES", "SIN_RESULTADO"):
+        return "sin_pagos"
+    # ERROR_SEGURIDAD, ERROR_PREGUNTAS_SEGURIDAD, ERROR_SIN_BOTON, ERROR, ERROR_BOT, ...
+    return "fallido"
+
+
 def vincular_consulta(conn, consulta_id: int, tabla: str, row_id: int, resultado: dict):
     """Vincula la consulta del proceso con la fila insertada en la tabla del bot."""
     cur = conn.cursor()
     cur.execute(
-        "UPDATE procesos_consultas SET consulta_tabla = %s, consulta_id = %s, estado = 'exitoso', "
+        "UPDATE procesos_consultas SET consulta_tabla = %s, consulta_id = %s, estado = %s, "
         "resultado_resumen = %s, updated_at = NOW() WHERE id = %s",
-        (tabla, row_id, json.dumps(resultado, ensure_ascii=False), consulta_id),
+        (tabla, row_id, _mapear_estado(str(resultado.get("estado", ""))),
+         json.dumps(resultado, ensure_ascii=False), consulta_id),
     )
     conn.commit()
     cur.close()
@@ -180,7 +192,7 @@ def ejecutar_bot(bot_name: str, numero_id: str, persona_tipo: str, consulta_id: 
             logger.info(f"{bot_name} para {numero_id}: {resultado.get('estado')} (id={row_id})")
         else:
             logger.warning(f"{bot_name} para {numero_id}: no se encontró fila insertada")
-            actualizar_progreso(consulta_id, "exitoso", resultado.get("motivo", ""), conn)
+            actualizar_progreso(consulta_id, _mapear_estado(str(resultado.get("estado", ""))), resultado.get("motivo", ""), conn)
     finally:
         conn.close()
 
