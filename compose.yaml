@@ -1,0 +1,49 @@
+services:
+  migrate:
+    build:
+      context: .
+      target: api
+    env_file: .env
+    command: ["sh", "-c", "npm -w backend run db:deploy && npm -w backend run db:seed"]
+
+  api:
+    build:
+      context: .
+      target: api
+    env_file: .env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "3001:3001"
+    environment:
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - files_data:/app/uploads
+
+  worker:
+    build:
+      context: .
+      target: api
+    env_file: .env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["node", "backend/dist/worker.js"]
+    environment:
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - files_data:/app/uploads
+
+  frontend:
+    build:
+      context: .
+      target: frontend
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+
+volumes:
+  files_data:
+    name: node2_files_data

@@ -1,0 +1,17 @@
+{
+  "name": "bybot-node2",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Gestión de usuarios, archivos, procesos y análisis IA.",
+  "workspaces": ["backend", "frontend"],
+  "scripts": {
+    "dev": "concurrently -n api,worker,web -c blue,yellow,magenta \"npm -w backend run dev\" \"npm -w backend run worker\" \"npm -w frontend run dev\"",
+    "build": "npm -w backend run build && npm -w frontend run build",
+    "typecheck": "npm -w backend run typecheck && npm -w frontend run typecheck",
+    "db:push": "npm -w backend run db:push",
+    "db:deploy": "npm -w backend run db:deploy",
+    "db:seed": "npm -w backend run db:seed"
+  },
+  "devDependencies": { "concurrently": "^9.0.1", "typescript": "^5.4.5" },
+  "engines": { "node": ">=20" }
+}
