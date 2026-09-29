@@ -17,7 +17,7 @@ await app.register(cors, { origin: config.FRONTEND_ORIGIN, credentials: true });
 await app.register(multipart, { limits: { fileSize: config.UPLOAD_MAX_MB * 1024 * 1024, files: 1 } });
 
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
-const publicUser = (user: { id: number; username: string; name: string; role: string; active: boolean }) => user;
+const publicUser = ({ id, username, name, role, active }: { id: number; username: string; name: string; role: string; active: boolean }) => ({ id, username, name, role, active });
 const allowedMimes = new Set(['application/pdf', 'text/plain', 'text/csv', 'application/json', 'image/jpeg', 'image/png']);
 const paginationSchema = z.object({ page: z.coerce.number().int().positive().default(1), limit: z.coerce.number().int().min(1).max(100).default(25) });
 
