@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test-build:
+    name: Typecheck · Test · Build
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        image: mariadb:10
+        env:
+          MARIADB_DATABASE: node2_test
+          MARIADB_USER: node2_app
+          MARIADB_PASSWORD: node2_test_pw
+          MARIADB_ROOT_PASSWORD: rootpw
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=8
+
+    env:
+      DATABASE_URL: mysql://node2_app:node2_test_pw@localhost:3306/node2_test
+      JWT_SECRET: ci-only-secret-with-at-least-32-characters-long
+      BACKEND_PORT: 3001
+      FRONTEND_ORIGIN: http://localhost:5173
+      UPLOAD_DIR: uploads
+      UPLOAD_MAX_MB: 25
+      AI_API_URL: ""
+      AI_API_KEY: ""
+      AI_MODEL: ""
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: test-admin-password-123!
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Aplicar esquema
+        run: npm run db:deploy
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests backend y frontend
+        run: npm run test
+
+      - name: Build
+        run: npm run build

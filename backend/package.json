@@ -9,6 +9,8 @@
     "worker": "tsx src/worker.ts",
     "worker:start": "node dist/worker.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "db:push": "prisma db push",
     "db:deploy": "prisma db execute --file prisma/ddl.sql",
     "db:seed": "tsx prisma/seed.ts"
@@ -29,6 +31,7 @@
     "@types/node": "^20.14.0",
     "prisma": "^5.16.0",
     "tsx": "^4.16.0",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "vitest": "^2.0.5"
   }
 }

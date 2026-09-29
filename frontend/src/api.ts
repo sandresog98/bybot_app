@@ -1,0 +1,54 @@
+import type { Analysis, Detail, FileItem, NewUserPayload, Process, User } from './types';
+
+const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api';
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const response = await fetch(`${apiUrl}${path}`, {
+    ...options,
+    credentials: 'include',
+    headers: { ...(options.headers ?? {}) },
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(payload?.message ?? 'La solicitud falló.');
+  return payload as T;
+}
+
+export const api = {
+  me: () => request<User>('/auth/me'),
+  login: (username: string, password: string) =>
+    request<{ user: User }>('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    }),
+  logout: () => request<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
+
+  listProcesses: () => request<{ items: Process[] }>('/processes'),
+  getProcess: (id: number) => request<Detail>(`/processes/${id}`),
+  createProcess: (title: string) =>
+    request<Process>('/processes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title }),
+    }),
+
+  listUsers: () => request<{ items: User[] }>('/users'),
+  createUser: (payload: NewUserPayload) =>
+    request<User>('/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }),
+
+  uploadFile: (processId: number, form: FormData) =>
+    request<FileItem>(`/processes/${processId}/files`, { method: 'POST', body: form }),
+
+  analyze: (processId: number, fileId?: number) =>
+    request<Analysis>(`/processes/${processId}/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileId }),
+    }),
+
+  downloadUrl: (fileId: number) => `${apiUrl}/files/${fileId}/download`,
+};

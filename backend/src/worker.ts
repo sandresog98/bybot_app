@@ -1,10 +1,11 @@
+import { pathToFileURL } from 'node:url';
 import { analyzeFile } from './ai.js';
 import { Prisma } from '@prisma/client';
 import { config } from './config.js';
 import { prisma } from './db.js';
 import { initializeStorage, readStoredFile } from './storage.js';
 
-async function executeNext() {
+export async function executeNext() {
   const candidate = await prisma.analysis.findFirst({ where: { status: 'queued', attempts: { lt: 3 } }, orderBy: { createdAt: 'asc' } });
   if (!candidate) return false;
   const claim = await prisma.analysis.updateMany({ where: { id: candidate.id, status: 'queued' }, data: { status: 'running', attempts: { increment: 1 } } });
@@ -27,4 +28,8 @@ async function main() {
   await initializeStorage();
   for (;;) { const processed = await executeNext(); if (!processed) await new Promise(resolve => setTimeout(resolve, config.ANALYSIS_POLL_MS)); }
 }
-main().catch(error => { console.error(error); process.exit(1); });
+
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMain) {
+  main().catch(error => { console.error(error); process.exit(1); });
+}

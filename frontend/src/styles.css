@@ -297,6 +297,47 @@ li { margin: 10px 0; }
 
 .placeholder { color: var(--muted); padding: 30px 0; text-align: center; }
 
+/* ---------- Toasts ---------- */
+.toasts {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 50;
+  display: grid;
+  gap: 10px;
+  max-width: min(360px, 90vw);
+}
+.toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--brand);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  font-size: 14px;
+  animation: toast-in 0.18s ease;
+}
+.toast-success { border-left-color: var(--success); }
+.toast-error { border-left-color: var(--danger); }
+.toast-info { border-left-color: var(--brand); }
+.toast-close {
+  background: transparent;
+  color: var(--muted);
+  border: 0;
+  padding: 0 4px;
+  font-size: 18px;
+  line-height: 1;
+}
+.toast-close:hover { background: transparent; color: var(--text); }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 720px) {
   .grid { grid-template-columns: 1fr; }
