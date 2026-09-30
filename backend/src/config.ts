@@ -14,6 +14,12 @@ const configSchema = z.object({
   AI_API_URL: z.string().url().optional().or(z.literal('')),
   AI_API_KEY: z.string().optional().or(z.literal('')),
   AI_MODEL: z.string().optional().or(z.literal('')),
+  AI_PROVIDER: z.enum(['openai', 'gemini']).default('openai'),
+  GEMINI_API_KEY: z.string().optional().or(z.literal('')),
+  GEMINI_MODEL: z.string().optional().default('gemini-2.5-flash'),
+  GEMINI_TEMPERATURE: z.coerce.number().min(0).max(2).default(0.1),
+  GEMINI_MAX_TOKENS: z.coerce.number().int().positive().default(26000),
+  GEMINI_THINKING_BUDGET: z.coerce.number().int().default(0),
 });
 
 export const config = configSchema.parse(process.env);

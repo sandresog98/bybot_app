@@ -16,6 +16,7 @@ function setUnconfigured() {
 describe('analyzeFile', () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
+    config.AI_PROVIDER = 'openai';
   });
 
   it('falla cuando el análisis IA no está configurado', async () => {
