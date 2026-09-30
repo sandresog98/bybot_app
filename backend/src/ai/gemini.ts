@@ -1,5 +1,5 @@
 import { config } from '../config.js';
-import { SYSTEM_PROMPT, type AIProvider, type AnalyzeInput } from './types.js';
+import { EXTRACTION_PROMPT, type AIProvider, type AiResult, type AnalyzeInput } from './types.js';
 
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -10,7 +10,7 @@ export class GeminiProvider implements AIProvider {
     return mimeType === 'application/pdf' || mimeType.startsWith('image/');
   }
 
-  async analyze(input: AnalyzeInput): Promise<object> {
+  async analyze(input: AnalyzeInput): Promise<AiResult> {
     if (!config.GEMINI_API_KEY || !config.GEMINI_MODEL) {
       throw new Error('El análisis IA con Gemini no está configurado. Define GEMINI_API_KEY y GEMINI_MODEL.');
     }
@@ -38,7 +38,7 @@ export class GeminiProvider implements AIProvider {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+          systemInstruction: { parts: [{ text: EXTRACTION_PROMPT }] },
           contents: [{ role: 'user', parts }],
           generationConfig,
         }),
@@ -52,9 +52,21 @@ export class GeminiProvider implements AIProvider {
       throw new Error(`El proveedor Gemini respondió ${response.status}.${detail ? ` ${detail}` : ''}`);
     }
 
-    const payload = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+    const payload = await response.json() as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number };
+    };
     const output = payload.candidates?.[0]?.content?.parts?.map(p => p.text ?? '').join('') ?? '';
     if (!output) throw new Error('El proveedor Gemini no entregó contenido.');
-    try { return JSON.parse(output) as object; } catch { return { respuesta: output }; }
+    let result: object;
+    try { result = JSON.parse(output) as object; } catch { result = { respuesta: output }; }
+    return {
+      result,
+      usage: {
+        inputTokens: payload.usageMetadata?.promptTokenCount,
+        outputTokens: payload.usageMetadata?.candidatesTokenCount,
+        model: config.GEMINI_MODEL,
+      },
+    };
   }
 }

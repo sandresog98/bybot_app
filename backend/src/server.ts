@@ -8,6 +8,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { audit } from './audit.js';
 import { requireAdmin, requireUser, signToken, type AuthUser } from './auth.js';
+import { Prisma } from '@prisma/client';
 import { config } from './config.js';
 import { prisma } from './db.js';
 import { initializeStorage, readStoredFile, removeStoredFile, saveUpload } from './storage.js';
@@ -127,6 +128,13 @@ export async function buildApp(): Promise<FastifyInstance> {
     const analysis = await prisma.analysis.create({ data: { processId, fileId: file.id, status: 'queued', provider: config.AI_PROVIDER, model: config.AI_PROVIDER === 'gemini' ? config.GEMINI_MODEL : config.AI_MODEL || null } }); await prisma.process.update({ where: { id: processId }, data: { status: 'analysis_queued' } }); await audit(user.id, 'queue_analysis', 'analysis', analysis.id); return analysis;
   });
   app.post('/api/analyses/:id/retry', async (request) => { const user = await requireUser(request); const id = z.coerce.number().int().parse((request.params as { id: string }).id); const analysis = await prisma.analysis.findUnique({ where: { id } }); if (!analysis) throw fail(404, 'Análisis no encontrado.'); await assertProcessAccess(analysis.processId, user); if (analysis.status !== 'failed' || analysis.attempts >= analysis.maxAttempts) throw fail(409, 'El análisis no se puede reintentar.'); return prisma.analysis.update({ where: { id }, data: { status: 'queued', error: null } }); });
+  app.post('/api/analyses/:id/validar', async (request) => {
+    const user = await requireUser(request); const id = z.coerce.number().int().parse((request.params as { id: string }).id);
+    const analysis = await prisma.analysis.findUnique({ where: { id } }); if (!analysis) throw fail(404, 'Análisis no encontrado.'); await assertProcessAccess(analysis.processId, user);
+    const body = z.object({ datos: z.record(z.string(), z.unknown()) }).parse(request.body);
+    await prisma.analysis.update({ where: { id }, data: { validated: body.datos as Prisma.InputJsonValue } });
+    await audit(user.id, 'validate', 'analysis', id); return { ok: true };
+  });
 
   app.setErrorHandler((error, _request, reply) => {
     const status = error instanceof z.ZodError ? 400 : (error as { statusCode?: number }).statusCode ?? 500;

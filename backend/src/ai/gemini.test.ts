@@ -19,7 +19,8 @@ describe('analyzeFile (proveedor Gemini)', () => {
 
     const result = await analyzeFile({ name: 'extracto.pdf', mimeType: 'application/pdf', content: Buffer.from('%PDF-1.4') });
 
-    expect(result).toEqual({ resumen: 'ok' });
+    expect(result.result).toEqual({ resumen: 'ok' });
+    expect(result.usage?.inputTokens).toBeUndefined();
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toContain(':generateContent');
     expect(url).toContain('test-key');

@@ -1,8 +1,8 @@
 import { config } from '../config.js';
-import { SYSTEM_PROMPT, type AIProvider, type AnalyzeInput } from './types.js';
+import { EXTRACTION_PROMPT, type AIProvider, type AiResult, type AnalyzeInput } from './types.js';
 
 export class OpenAIProvider implements AIProvider {
-  async analyze(input: AnalyzeInput): Promise<object> {
+  async analyze(input: AnalyzeInput): Promise<AiResult> {
     if (!config.AI_API_URL || !config.AI_API_KEY || !config.AI_MODEL) {
       throw new Error('El análisis IA no está configurado. Define AI_API_URL, AI_API_KEY y AI_MODEL.');
     }
@@ -19,7 +19,7 @@ export class OpenAIProvider implements AIProvider {
         body: JSON.stringify({
           model: config.AI_MODEL,
           messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'system', content: EXTRACTION_PROMPT },
             { role: 'user', content: `<archivo nombre="${input.name}">\n${content}\n</archivo>` },
           ],
           response_format: { type: 'json_object' },
@@ -28,9 +28,21 @@ export class OpenAIProvider implements AIProvider {
       });
     } finally { clearTimeout(timeout); }
     if (!response.ok) throw new Error(`El proveedor IA respondió ${response.status}.`);
-    const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+    const payload = await response.json() as {
+      choices?: Array<{ message?: { content?: string } }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
+    };
     const output = payload.choices?.[0]?.message?.content;
     if (!output) throw new Error('El proveedor IA no entregó contenido.');
-    try { return JSON.parse(output) as object; } catch { return { respuesta: output }; }
+    let result: object;
+    try { result = JSON.parse(output) as object; } catch { result = { respuesta: output }; }
+    return {
+      result,
+      usage: {
+        inputTokens: payload.usage?.prompt_tokens,
+        outputTokens: payload.usage?.completion_tokens,
+        model: config.AI_MODEL,
+      },
+    };
   }
 }

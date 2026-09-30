@@ -41,7 +41,8 @@ describe('analyzeFile', () => {
 
     const result = await analyzeFile({ name: 'datos.csv', mimeType: 'text/csv', content: Buffer.from('fila1,fila2') });
 
-    expect(result).toEqual({ resumen: 'ok', riesgos: [] });
+    expect(result.result).toEqual({ resumen: 'ok', riesgos: [] });
+    expect(result.usage?.model).toBe('test-model');
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe(config.AI_API_URL);
     const body = JSON.parse(init.body as string);

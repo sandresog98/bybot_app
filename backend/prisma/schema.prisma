@@ -51,20 +51,25 @@ model File {
 }
 
 model Analysis {
-  id        Int      @id @default(autoincrement())
-  processId Int
-  fileId    Int?
-  status    String   @default("pending")
-  provider  String?
-  model     String?
-  result    Json?
-  error     String?
-  attempts  Int      @default(0)
-  maxAttempts Int    @default(3)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  process   Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
-  file      File?    @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  id           Int      @id @default(autoincrement())
+  processId    Int
+  fileId       Int?
+  status       String   @default("pending")
+  provider     String?
+  model        String?
+  result       Json?
+  validated    Json?
+  error        String?
+  inputTokens  Int?
+  outputTokens Int?
+  costUsd      Decimal? @db.Decimal(12, 6)
+  attempts     Int      @default(0)
+  maxAttempts  Int      @default(3)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  process      Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
+  file         File?    @relation(fields: [fileId], references: [id], onDelete: SetNull)
+
   @@index([processId])
   @@index([status, createdAt])
 }

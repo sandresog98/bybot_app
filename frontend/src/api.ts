@@ -50,5 +50,12 @@ export const api = {
       body: JSON.stringify({ fileId }),
     }),
 
+  validarAnalysis: (analysisId: number, datos: unknown) =>
+    request<{ ok: boolean }>(`/analyses/${analysisId}/validar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ datos }),
+    }),
+
   downloadUrl: (fileId: number) => `${apiUrl}/files/${fileId}/download`,
 };

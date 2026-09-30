@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react';
 import type { Detail } from '../types';
+import { ResultadoIA } from './ResultadoIA';
 
 type Props = {
   selected: Detail | null;
@@ -8,11 +9,13 @@ type Props = {
   onUpload: (form: FormData) => Promise<void>;
   onAnalyze: (fileId?: number) => Promise<void>;
   onDownload: (fileId: number, name: string) => void;
+  onValidar: (analysisId: number, datos: unknown) => Promise<void>;
 };
 
 const extensionOf = (name: string) => name.split('.').pop()?.toUpperCase() ?? 'FILE';
+const fmtUsd = (v: string | number | null | undefined) => (v == null ? null : `USD ${Number(v).toFixed(6)}`);
 
-export function ProcessDetail({ selected, busyUpload, busyAnalyze, onUpload, onAnalyze, onDownload }: Props) {
+export function ProcessDetail({ selected, busyUpload, busyAnalyze, onUpload, onAnalyze, onDownload, onValidar }: Props) {
   const handleUpload = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formEl = event.currentTarget;
@@ -53,10 +56,25 @@ export function ProcessDetail({ selected, busyUpload, busyAnalyze, onUpload, onA
       <h3>Resultados</h3>
       {selected.analyses.length === 0
         ? <p className="placeholder">Aún no hay análisis en este proceso.</p>
-        : selected.analyses.map(item => (
-          <details key={item.id} className="result" open={item.status === 'completed'}>
-            <summary>{item.status}</summary>
-            <pre>{JSON.stringify(item.result ?? { error: item.error }, null, 2)}</pre>
+        : selected.analyses.map(item => item.status === 'completed' ? (
+          <section key={item.id} className="result-block">
+            <div className="result-head">
+              <span className="status" data-status={item.status}>completado</span>
+              {item.model && <span className="consumo-chip">{item.model}</span>}
+              {(item.inputTokens != null || item.outputTokens != null) && (
+                <span className="consumo-chip">tok {item.inputTokens ?? 0} / {item.outputTokens ?? 0}</span>
+              )}
+              {fmtUsd(item.costUsd) && <span className="consumo-chip">{fmtUsd(item.costUsd)}</span>}
+            </div>
+            <ResultadoIA
+              data={item.validated ?? item.result ?? { error: item.error }}
+              onSave={datos => onValidar(item.id, datos)}
+            />
+          </section>
+        ) : (
+          <details key={item.id} className="result" open={item.status === 'failed'}>
+            <summary><span className="status" data-status={item.status}>{item.status}</span></summary>
+            {item.error && <p className="notice">{item.error}</p>}
           </details>
         ))}
     </article>

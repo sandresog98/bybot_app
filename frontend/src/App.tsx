@@ -95,6 +95,13 @@ export function App() {
       URL.revokeObjectURL(url);
     });
 
+  const validar = (analysisId: number, datos: unknown) =>
+    run('validar', async () => {
+      await api.validarAnalysis(analysisId, datos);
+      toast('success', 'Validación guardada.');
+      if (selected) setSelected(await api.getProcess(selected.id));
+    });
+
   if (!user) return <Login onSubmit={login} busy={busy['login'] ?? false} />;
 
   return (
@@ -125,6 +132,7 @@ export function App() {
           onUpload={upload}
           onAnalyze={analyze}
           onDownload={download}
+          onValidar={validar}
         />
       </section>
     </main>

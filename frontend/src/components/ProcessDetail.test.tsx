@@ -21,6 +21,7 @@ const baseProps = {
   onUpload: vi.fn().mockResolvedValue(undefined),
   onAnalyze: vi.fn().mockResolvedValue(undefined),
   onDownload: vi.fn(),
+  onValidar: vi.fn().mockResolvedValue(undefined),
 };
 
 describe('ProcessDetail', () => {
@@ -55,9 +56,10 @@ describe('ProcessDetail', () => {
     expect(form.get('file')).toBeInstanceOf(File);
   });
 
-  it('muestra resultados de análisis', () => {
+  it('muestra resultados de análisis con validación', () => {
     render(<ProcessDetail {...baseProps} />);
-    expect(screen.getByText('completed')).toBeInTheDocument();
-    expect(screen.getByText(/resumen/)).toBeInTheDocument();
+    expect(screen.getByText('Resumen')).toBeInTheDocument();
+    expect(screen.getByText('ok')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Editar' })).toBeInTheDocument();
   });
 });

@@ -297,6 +297,28 @@ li { margin: 10px 0; }
 
 .placeholder { color: var(--muted); padding: 30px 0; text-align: center; }
 
+/* ---------- Resultado IA (cards + tablas) ---------- */
+.result-block { margin: 14px 0; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.result-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.consumo-chip { padding: 2px 9px; border-radius: 999px; background: var(--bg); color: var(--muted); font-size: 12px; font-weight: 600; }
+.ia { }
+.ia-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.ia-title { font-weight: 700; color: var(--text); }
+.ia-actions { display: flex; gap: 8px; }
+.ia-card { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; margin: 8px 0; }
+.ia-row { display: grid; grid-template-columns: minmax(150px, 40%) 1fr; border-bottom: 1px solid var(--border); }
+.ia-row:last-child { border-bottom: 0; }
+.ia-label { padding: 8px 12px; background: var(--bg); color: var(--muted); font-size: 12.5px; font-weight: 600; }
+.ia-value { padding: 8px 12px; font-size: 13.5px; word-break: break-word; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.ia-value input { padding: 6px 8px; }
+.ia-table-wrap { margin: 8px 0; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: auto; max-height: 320px; }
+.ia-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.ia-table th { position: sticky; top: 0; background: var(--bg); text-align: left; padding: 8px 10px; font-size: 12px; z-index: 1; }
+.ia-table td { padding: 7px 10px; border-top: 1px solid var(--border); vertical-align: top; }
+.ia-table tr:nth-child(even) td { background: #fafbfd; }
+.ia-table td input { padding: 5px 7px; width: 100%; }
+.muted { color: var(--muted); }
+
 /* ---------- Toasts ---------- */
 .toasts {
   position: fixed;

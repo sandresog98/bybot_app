@@ -1,5 +1,6 @@
 import { pathToFileURL } from 'node:url';
 import { analyzeFile } from './ai.js';
+import { estimateCostUsd } from './ai/cost.js';
 import { Prisma } from '@prisma/client';
 import { config } from './config.js';
 import { prisma } from './db.js';
@@ -13,9 +14,17 @@ export async function executeNext() {
   const analysis = await prisma.analysis.findUniqueOrThrow({ where: { id: candidate.id }, include: { file: true } });
   if (!analysis.file) { await prisma.analysis.update({ where: { id: analysis.id }, data: { status: 'failed', error: 'El archivo asociado ya no existe.' } }); return true; }
   try {
-    const result = await analyzeFile({ name: analysis.file.originalName, mimeType: analysis.file.mimeType, content: await readStoredFile(analysis.file.storageKey) });
+    const { result, usage } = await analyzeFile({ name: analysis.file.originalName, mimeType: analysis.file.mimeType, content: await readStoredFile(analysis.file.storageKey) });
     const storedResult = JSON.parse(JSON.stringify(result)) as Prisma.InputJsonValue;
-    await prisma.$transaction([prisma.analysis.update({ where: { id: analysis.id }, data: { status: 'completed', result: storedResult, error: null } }), prisma.process.update({ where: { id: analysis.processId }, data: { status: 'analyzed' } })]);
+    const model = usage?.model ?? analysis.model;
+    await prisma.$transaction([prisma.analysis.update({
+      where: { id: analysis.id },
+      data: {
+        status: 'completed', result: storedResult, error: null,
+        model, inputTokens: usage?.inputTokens ?? null, outputTokens: usage?.outputTokens ?? null,
+        costUsd: estimateCostUsd(model ?? undefined, usage?.inputTokens, usage?.outputTokens),
+      },
+    }), prisma.process.update({ where: { id: analysis.processId }, data: { status: 'analyzed' } })]);
   } catch (error) {
     const message = error instanceof Error && error.name === 'AbortError' ? 'El proveedor IA excedió el tiempo de espera.' : 'No se pudo completar el análisis. Reintenta más tarde.';
     const attempts = analysis.attempts;

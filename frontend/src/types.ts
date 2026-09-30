@@ -25,8 +25,14 @@ export type FileItem = {
 export type Analysis = {
   id: number;
   status: string;
+  provider?: string;
+  model?: string;
   result?: unknown;
+  validated?: unknown;
   error?: string;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
+  costUsd?: string | number | null;
 };
 
 export type Detail = Process & {
