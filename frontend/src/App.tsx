@@ -126,18 +126,26 @@ export function App() {
       {user.role === 'admin' && (
         <UsersPanel users={users} busy={busy['createUser'] ?? false} onSubmit={createUser} />
       )}
-      <section className="grid">
-        <ProcessList processes={processes} entidades={entidades} busy={busy['createProcess'] ?? false} onSelect={openProcess} onCreate={createProcess} />
-        <ProcessDetail
-          selected={selected}
-          busyUpload={busy['upload'] ?? false}
-          busyAnalyze={busy['analyze'] ?? false}
-          onUpload={upload}
-          onAnalyze={analyze}
-          onDownload={download}
-          onValidar={validar}
-        />
-      </section>
+      {selected ? (
+        <section className="detail-view">
+          <div className="detail-toolbar">
+            <button type="button" className="btn-ghost" onClick={() => setSelected(null)}>← Volver a la lista</button>
+          </div>
+          <ProcessDetail
+            selected={selected}
+            busyUpload={busy['upload'] ?? false}
+            busyAnalyze={busy['analyze'] ?? false}
+            onUpload={upload}
+            onAnalyze={analyze}
+            onDownload={download}
+            onValidar={validar}
+          />
+        </section>
+      ) : (
+        <section className="list-view">
+          <ProcessList processes={processes} entidades={entidades} busy={busy['createProcess'] ?? false} onSelect={openProcess} onCreate={createProcess} />
+        </section>
+      )}
     </main>
   );
 }

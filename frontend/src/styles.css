@@ -195,6 +195,11 @@ label { font-size: 13px; font-weight: 600; color: var(--muted); }
 
 .grid { display: grid; grid-template-columns: minmax(320px, 38%) 1fr; gap: 20px; align-items: start; }
 
+.list-view .process-card, .list-view aside, .list-view article { padding: 22px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
+.detail-view article { padding: 26px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); min-height: 320px; }
+.detail-toolbar { margin-bottom: 14px; }
+.detail-toolbar button { margin: 0; }
+
 aside, article { padding: 22px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
 article { min-height: 260px; }
 
