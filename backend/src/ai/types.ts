@@ -1,4 +1,4 @@
-export type AnalyzeInput = { name: string; mimeType: string; content: Buffer };
+export type AnalyzeInput = { name: string; mimeType: string; content: Buffer; tipo?: string; entidadCodigo?: string };
 
 export type AiUsage = {
   inputTokens?: number;
@@ -12,7 +12,7 @@ export type AiResult = {
 };
 
 export interface AIProvider {
-  analyze(input: AnalyzeInput): Promise<AiResult>;
+  analyze(input: AnalyzeInput, prompt: string): Promise<AiResult>;
 }
 
 export const SYSTEM_PROMPT =

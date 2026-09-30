@@ -5,13 +5,14 @@ import { ProcessDetail } from './components/ProcessDetail';
 import { ProcessList } from './components/ProcessList';
 import { Toasts } from './components/Toasts';
 import { UsersPanel } from './components/UsersPanel';
-import type { Detail, NewUserPayload, Process, Toast, User } from './types';
+import type { Detail, Entidad, NewUserPayload, Process, Toast, User } from './types';
 
 let nextToastId = 0;
 
 export function App() {
   const [user, setUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
+  const [entidades, setEntidades] = useState<Entidad[]>([]);
   const [processes, setProcesses] = useState<Process[]>([]);
   const [selected, setSelected] = useState<Detail | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -41,6 +42,8 @@ export function App() {
     setUser(currentUser);
     const page = await api.listProcesses();
     setProcesses(page.items);
+    const entidades = await api.listEntidades();
+    setEntidades(entidades);
     if (currentUser.role === 'admin') {
       const userPage = await api.listUsers();
       setUsers(userPage.items);
@@ -59,16 +62,16 @@ export function App() {
 
   const openProcess = (id: number) => void run('open', async () => { setSelected(await api.getProcess(id)); });
 
-  const createProcess = (title: string) =>
-    run('createProcess', async () => { const p = await api.createProcess(title); toast('success', 'Proceso creado.'); await refresh(); setSelected(await api.getProcess(p.id)); });
+  const createProcess = (title: string, entidadId?: number) =>
+    run('createProcess', async () => { const p = await api.createProcess(title, entidadId); toast('success', 'Proceso creado.'); await refresh(); setSelected(await api.getProcess(p.id)); });
 
   const createUser = (payload: NewUserPayload) =>
     run('createUser', async () => { await api.createUser(payload); toast('success', 'Usuario creado.'); await refresh(); });
 
-  const upload = (form: FormData) =>
+  const upload = (form: FormData, tipo?: string) =>
     run('upload', async () => {
       if (!selected) return;
-      await api.uploadFile(selected.id, form);
+      await api.uploadFile(selected.id, form, tipo);
       toast('success', 'Archivo subido.');
       setSelected(await api.getProcess(selected.id));
       await refresh();
@@ -124,7 +127,7 @@ export function App() {
         <UsersPanel users={users} busy={busy['createUser'] ?? false} onSubmit={createUser} />
       )}
       <section className="grid">
-        <ProcessList processes={processes} busy={busy['createProcess'] ?? false} onSelect={openProcess} onCreate={createProcess} />
+        <ProcessList processes={processes} entidades={entidades} busy={busy['createProcess'] ?? false} onSelect={openProcess} onCreate={createProcess} />
         <ProcessDetail
           selected={selected}
           busyUpload={busy['upload'] ?? false}

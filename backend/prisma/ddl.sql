@@ -13,16 +13,27 @@ CREATE TABLE IF NOT EXISTS `User` (
   PRIMARY KEY (id), UNIQUE KEY user_username_key (username)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `Entidad` (
+  id INT NOT NULL AUTO_INCREMENT,
+  codigo VARCHAR(60) NOT NULL,
+  nombre VARCHAR(160) NOT NULL,
+  nit VARCHAR(40) NULL,
+  createdAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id), UNIQUE KEY entidad_codigo_key (codigo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `Process` (
   id INT NOT NULL AUTO_INCREMENT,
   code VARCHAR(50) NOT NULL,
   title VARCHAR(120) NOT NULL,
   status VARCHAR(40) NOT NULL DEFAULT 'created',
+  entidadId INT NULL,
   createdBy INT NOT NULL,
   createdAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updatedAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id), UNIQUE KEY process_code_key (code),
-  CONSTRAINT process_created_by_fkey FOREIGN KEY (createdBy) REFERENCES `User` (id)
+  CONSTRAINT process_created_by_fkey FOREIGN KEY (createdBy) REFERENCES `User` (id),
+  CONSTRAINT process_entidad_id_fkey FOREIGN KEY (entidadId) REFERENCES `Entidad` (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `File` (
@@ -33,6 +44,7 @@ CREATE TABLE IF NOT EXISTS `File` (
   mimeType VARCHAR(120) NOT NULL,
   sizeBytes INT NOT NULL,
   sha256 CHAR(64) NOT NULL,
+  tipo VARCHAR(40) NULL,
   uploadedBy INT NOT NULL,
   createdAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id), UNIQUE KEY file_storage_key_key (storageKey), KEY file_process_id_idx (processId),

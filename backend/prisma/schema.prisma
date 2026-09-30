@@ -21,15 +21,26 @@ model User {
   auditEvents  AuditEvent[]
 }
 
+model Entidad {
+  id       Int       @id @default(autoincrement())
+  codigo   String    @unique
+  nombre   String
+  nit      String?
+  processes Process[]
+  createdAt DateTime @default(now())
+}
+
 model Process {
   id        Int       @id @default(autoincrement())
   code      String    @unique
   title     String
   status    String    @default("created")
+  entidadId Int?
   createdBy Int
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   creator   User      @relation("CreatedProcesses", fields: [createdBy], references: [id])
+  entidad   Entidad?  @relation(fields: [entidadId], references: [id])
   files     File[]
   analyses  Analysis[]
 }
@@ -42,6 +53,7 @@ model File {
   mimeType     String
   sizeBytes    Int
   sha256       String
+  tipo         String?
   uploadedBy   Int
   createdAt    DateTime @default(now())
   process      Process  @relation(fields: [processId], references: [id], onDelete: Cascade)

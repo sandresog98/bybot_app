@@ -11,10 +11,14 @@ export async function executeNext() {
   if (!candidate) return false;
   const claim = await prisma.analysis.updateMany({ where: { id: candidate.id, status: 'queued' }, data: { status: 'running', attempts: { increment: 1 } } });
   if (claim.count === 0) return true;
-  const analysis = await prisma.analysis.findUniqueOrThrow({ where: { id: candidate.id }, include: { file: true } });
+  const analysis = await prisma.analysis.findUniqueOrThrow({ where: { id: candidate.id }, include: { file: true, process: { include: { entidad: true } } } });
   if (!analysis.file) { await prisma.analysis.update({ where: { id: analysis.id }, data: { status: 'failed', error: 'El archivo asociado ya no existe.' } }); return true; }
   try {
-    const { result, usage } = await analyzeFile({ name: analysis.file.originalName, mimeType: analysis.file.mimeType, content: await readStoredFile(analysis.file.storageKey) });
+    const { result, usage } = await analyzeFile({
+      name: analysis.file.originalName, mimeType: analysis.file.mimeType, tipo: analysis.file.tipo ?? undefined,
+      entidadCodigo: analysis.process.entidad?.codigo,
+      content: await readStoredFile(analysis.file.storageKey),
+    });
     const storedResult = JSON.parse(JSON.stringify(result)) as Prisma.InputJsonValue;
     const model = usage?.model ?? analysis.model;
     await prisma.$transaction([prisma.analysis.update({

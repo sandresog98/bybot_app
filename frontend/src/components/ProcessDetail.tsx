@@ -1,4 +1,5 @@
 import type { FormEvent } from 'react';
+import { FILE_TIPO_LABELS } from '../types';
 import type { Detail } from '../types';
 import { ResultadoIA } from './ResultadoIA';
 
@@ -6,7 +7,7 @@ type Props = {
   selected: Detail | null;
   busyUpload: boolean;
   busyAnalyze: boolean;
-  onUpload: (form: FormData) => Promise<void>;
+  onUpload: (form: FormData, tipo?: string) => Promise<void>;
   onAnalyze: (fileId?: number) => Promise<void>;
   onDownload: (fileId: number, name: string) => void;
   onValidar: (analysisId: number, datos: unknown) => Promise<void>;
@@ -20,7 +21,8 @@ export function ProcessDetail({ selected, busyUpload, busyAnalyze, onUpload, onA
     event.preventDefault();
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
-    void onUpload(form).then(() => formEl.reset());
+    const tipo = String(form.get('tipo') ?? '').trim() || undefined;
+    void onUpload(form, tipo).then(() => formEl.reset());
   };
 
   if (!selected) return <article><p className="placeholder">Selecciona o crea un proceso.</p></article>;
@@ -28,11 +30,17 @@ export function ProcessDetail({ selected, busyUpload, busyAnalyze, onUpload, onA
   return (
     <article>
       <h2>{selected.title}</h2>
-      <p className="hint">{selected.code} · <span className="status" data-status={selected.status}>{selected.status}</span></p>
+      <p className="hint">
+        {selected.code} · <span className="status" data-status={selected.status}>{selected.status}</span>
+        {selected.entidad && <> · Cliente: <strong>{selected.entidad.nombre}</strong></>}
+      </p>
 
       <h3>Archivos</h3>
       <form onSubmit={handleUpload} className="inline">
         <input name="file" type="file" accept=".pdf,.txt,.csv,.json,.jpg,.jpeg,.png" required />
+        <select name="tipo" defaultValue="otro">
+          {Object.entries(FILE_TIPO_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
         <button type="submit" disabled={busyUpload}>{busyUpload ? 'Subiendo…' : 'Subir'}</button>
       </form>
       <ul>
@@ -43,7 +51,9 @@ export function ProcessDetail({ selected, busyUpload, busyAnalyze, onUpload, onA
               <span className="ico">{extensionOf(file.originalName)}</span>
               <span>{file.originalName}</span>
             </button>
-            <span className="file-size">{(file.sizeBytes / 1024).toFixed(1)} KB</span>
+            <span className="file-size">
+              {file.tipo ? FILE_TIPO_LABELS[file.tipo] ?? file.tipo : ''} · {(file.sizeBytes / 1024).toFixed(1)} KB
+            </span>
             <span className="file-actions">
               <button className="btn-small" disabled={busyAnalyze} onClick={() => void onAnalyze(file.id)}>
                 {busyAnalyze ? 'Analizando…' : 'Analizar IA'}

@@ -33,7 +33,7 @@ describe('ProcessDetail', () => {
   it('lista archivos, tamaño e inicia análisis por archivo', async () => {
     render(<ProcessDetail {...baseProps} />);
     expect(screen.getByText('extracto.pdf')).toBeInTheDocument();
-    expect(screen.getByText('2.0 KB')).toBeInTheDocument();
+    expect(screen.getByText(/2\.0 KB/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Analizar IA' }));
     expect(baseProps.onAnalyze).toHaveBeenCalledWith(7);
   });

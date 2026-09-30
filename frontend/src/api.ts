@@ -1,4 +1,4 @@
-import type { Analysis, Detail, FileItem, NewUserPayload, Process, User } from './types';
+import type { Analysis, Detail, Entidad, FileItem, NewUserPayload, Process, User } from './types';
 
 const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api';
 
@@ -25,11 +25,19 @@ export const api = {
 
   listProcesses: () => request<{ items: Process[] }>('/processes'),
   getProcess: (id: number) => request<Detail>(`/processes/${id}`),
-  createProcess: (title: string) =>
+  createProcess: (title: string, entidadId?: number) =>
     request<Process>('/processes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title }),
+      body: JSON.stringify({ title, entidadId }),
+    }),
+
+  listEntidades: () => request<Entidad[]>('/entidades'),
+  createEntidad: (payload: { codigo: string; nombre: string; nit?: string }) =>
+    request<Entidad>('/entidades', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     }),
 
   listUsers: () => request<{ items: User[] }>('/users'),
@@ -40,8 +48,8 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
-  uploadFile: (processId: number, form: FormData) =>
-    request<FileItem>(`/processes/${processId}/files`, { method: 'POST', body: form }),
+  uploadFile: (processId: number, form: FormData, tipo?: string) =>
+    request<FileItem>(`/processes/${processId}/files${tipo ? `?tipo=${encodeURIComponent(tipo)}` : ''}`, { method: 'POST', body: form }),
 
   analyze: (processId: number, fileId?: number) =>
     request<Analysis>(`/processes/${processId}/analyze`, {

@@ -1,8 +1,8 @@
 import { config } from '../config.js';
-import { EXTRACTION_PROMPT, type AIProvider, type AiResult, type AnalyzeInput } from './types.js';
+import type { AIProvider, AiResult, AnalyzeInput } from './types.js';
 
 export class OpenAIProvider implements AIProvider {
-  async analyze(input: AnalyzeInput): Promise<AiResult> {
+  async analyze(input: AnalyzeInput, prompt: string): Promise<AiResult> {
     if (!config.AI_API_URL || !config.AI_API_KEY || !config.AI_MODEL) {
       throw new Error('El análisis IA no está configurado. Define AI_API_URL, AI_API_KEY y AI_MODEL.');
     }
@@ -19,7 +19,7 @@ export class OpenAIProvider implements AIProvider {
         body: JSON.stringify({
           model: config.AI_MODEL,
           messages: [
-            { role: 'system', content: EXTRACTION_PROMPT },
+            { role: 'system', content: prompt },
             { role: 'user', content: `<archivo nombre="${input.name}">\n${content}\n</archivo>` },
           ],
           response_format: { type: 'json_object' },

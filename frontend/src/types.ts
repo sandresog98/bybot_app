@@ -6,12 +6,32 @@ export type User = {
   active: boolean;
 };
 
+export type Entidad = {
+  id: number;
+  codigo: string;
+  nombre: string;
+  nit?: string | null;
+};
+
+export const FILE_TIPOS = ['estado_cuenta', 'amortizacion', 'pagare', 'vinculacion', 'poder', 'anexo', 'otro'] as const;
+export type FileTipo = (typeof FILE_TIPOS)[number];
+export const FILE_TIPO_LABELS: Record<string, string> = {
+  estado_cuenta: 'Estado de cuenta',
+  amortizacion: 'Amortización / plan de pagos',
+  pagare: 'Pagaré',
+  vinculacion: 'Vinculación',
+  poder: 'Poder',
+  anexo: 'Anexos',
+  otro: 'Otro',
+};
+
 export type Process = {
   id: number;
   code: string;
   title: string;
   status: string;
   createdAt: string;
+  entidad?: { codigo: string; nombre: string } | null;
   _count?: { files: number; analyses: number };
 };
 
@@ -20,6 +40,7 @@ export type FileItem = {
   originalName: string;
   mimeType: string;
   sizeBytes: number;
+  tipo?: string | null;
 };
 
 export type Analysis = {

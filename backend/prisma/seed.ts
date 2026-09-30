@@ -12,4 +12,15 @@ await prisma.user.upsert({
   update: {},
   create: { username, passwordHash: await bcrypt.hash(password, 12), name: 'Administrador', role: 'admin' },
 });
+
+const entidades = [
+  { codigo: 'condiar', nombre: 'CONDIAR' },
+  { codigo: 'crearcoop', nombre: 'Cooperativa CREAR LTDA' },
+  { codigo: 'somec', nombre: 'SOCIAL Y DE MERCADEO CENTRAL LTDA (SOMEC)' },
+];
+for (const e of entidades) {
+  await prisma.entidad.upsert({ where: { codigo: e.codigo }, update: {}, create: e });
+}
+
 await prisma.$disconnect();
+console.log(`Seed OK: admin y ${entidades.length} entidades.`);

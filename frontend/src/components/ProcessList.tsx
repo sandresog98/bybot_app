@@ -1,18 +1,20 @@
 import type { FormEvent } from 'react';
-import type { Process } from '../types';
+import type { Entidad, Process } from '../types';
 
 type Props = {
   processes: Process[];
+  entidades: Entidad[];
   busy: boolean;
   onSelect: (id: number) => void;
-  onCreate: (title: string) => Promise<void>;
+  onCreate: (title: string, entidadId?: number) => Promise<void>;
 };
 
-export function ProcessList({ processes, busy, onSelect, onCreate }: Props) {
+export function ProcessList({ processes, entidades, busy, onSelect, onCreate }: Props) {
   const handle = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    onCreate(String(form.get('title') ?? ''));
+    const entidadId = Number(form.get('entidadId') ?? '0');
+    onCreate(String(form.get('title') ?? ''), entidadId > 0 ? entidadId : undefined);
     event.currentTarget.reset();
   };
 
@@ -21,6 +23,10 @@ export function ProcessList({ processes, busy, onSelect, onCreate }: Props) {
       <h2>Procesos</h2>
       <form onSubmit={handle} className="inline">
         <input name="title" placeholder="Nombre del proceso" required />
+        <select name="entidadId" defaultValue="0">
+          <option value="0">Sin cliente</option>
+          {entidades.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+        </select>
         <button type="submit" disabled={busy}>{busy ? 'Creando…' : 'Crear'}</button>
       </form>
       <ul>
@@ -31,7 +37,7 @@ export function ProcessList({ processes, busy, onSelect, onCreate }: Props) {
               <span className="title">{process.title}</span>
               <small>
                 <span className="status" data-status={process.status}>{process.status}</span>
-                {process._count?.files ?? 0} archivos
+                {process.entidad ? process.entidad.nombre : 'Sin cliente'} · {process._count?.files ?? 0} archivos
               </small>
             </button>
           </li>

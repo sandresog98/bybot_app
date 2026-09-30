@@ -12,10 +12,12 @@ import { Prisma } from '@prisma/client';
 import { config } from './config.js';
 import { prisma } from './db.js';
 import { initializeStorage, readStoredFile, removeStoredFile, saveUpload } from './storage.js';
+import { FILE_TIPOS } from './ai/prompts.js';
 
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 const publicUser = ({ id, username, name, role, active }: { id: number; username: string; name: string; role: string; active: boolean }) => ({ id, username, name, role, active });
 const allowedMimes = new Set(['application/pdf', 'text/plain', 'text/csv', 'application/json', 'image/jpeg', 'image/png']);
+const fileTipos = new Set<string>(FILE_TIPOS);
 const paginationSchema = z.object({ page: z.coerce.number().int().positive().default(1), limit: z.coerce.number().int().min(1).max(100).default(25) });
 
 function fail(statusCode: number, message: string) { return Object.assign(new Error(message), { statusCode }); }
@@ -89,27 +91,40 @@ export async function buildApp(): Promise<FastifyInstance> {
     await audit(admin.id, 'update', 'user', user.id); return publicUser(user);
   });
 
+  app.get('/api/entidades', async (request) => {
+    await requireUser(request);
+    return prisma.entidad.findMany({ orderBy: { nombre: 'asc' }, select: { id: true, codigo: true, nombre: true, nit: true } });
+  });
+  app.post('/api/entidades', async (request) => {
+    const admin = await requireAdmin(request);
+    const body = z.object({ codigo: z.string().trim().min(2).max(60).regex(/^[a-zA-Z0-9_.-]+$/), nombre: z.string().trim().min(2).max(160), nit: z.string().trim().max(40).optional() }).parse(request.body);
+    const exists = await prisma.entidad.findUnique({ where: { codigo: body.codigo } }); if (exists) throw fail(409, 'La entidad ya existe.');
+    const entidad = await prisma.entidad.create({ data: body }); await audit(admin.id, 'create', 'entidad', entidad.id, entidad.codigo); return entidad;
+  });
+
   app.get('/api/processes', async (request) => {
     const user = await requireUser(request); const { page, limit } = paginationSchema.parse(request.query); const where = user.role === 'admin' ? {} : { createdBy: user.id };
-    const [items, total] = await prisma.$transaction([prisma.process.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit, include: { creator: { select: { name: true } }, _count: { select: { files: true, analyses: true } } } }), prisma.process.count({ where })]);
+    const [items, total] = await prisma.$transaction([prisma.process.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit, include: { creator: { select: { name: true } }, entidad: { select: { codigo: true, nombre: true } }, _count: { select: { files: true, analyses: true } } } }), prisma.process.count({ where })]);
     return { items, total, page, limit };
   });
   app.post('/api/processes', async (request) => {
-    const user = await requireUser(request); const body = z.object({ title: z.string().trim().min(3).max(120) }).parse(request.body);
-    const process = await prisma.process.create({ data: { code: processCode(), title: body.title, createdBy: user.id } }); await audit(user.id, 'create', 'process', process.id, process.code); return process;
+    const user = await requireUser(request); const body = z.object({ title: z.string().trim().min(3).max(120), entidadId: z.number().int().positive().optional() }).parse(request.body);
+    if (body.entidadId) { const ent = await prisma.entidad.findUnique({ where: { id: body.entidadId } }); if (!ent) throw fail(400, 'Entidad no válida.'); }
+    const process = await prisma.process.create({ data: { code: processCode(), title: body.title, createdBy: user.id, entidadId: body.entidadId ?? null } }); await audit(user.id, 'create', 'process', process.id, process.code); return process;
   });
   app.get('/api/processes/:id', async (request) => {
     const user = await requireUser(request); const id = z.coerce.number().int().parse((request.params as { id: string }).id); await assertProcessAccess(id, user);
-    return prisma.process.findUniqueOrThrow({ where: { id }, include: { files: { orderBy: { createdAt: 'desc' } }, analyses: { orderBy: { createdAt: 'desc' } }, creator: { select: { name: true } } } });
+    return prisma.process.findUniqueOrThrow({ where: { id }, include: { files: { orderBy: { createdAt: 'desc' } }, analyses: { orderBy: { createdAt: 'desc' } }, creator: { select: { name: true } }, entidad: { select: { codigo: true, nombre: true } } } });
   });
   app.post('/api/processes/:id/files', async (request) => {
     const user = await requireUser(request); const processId = z.coerce.number().int().parse((request.params as { id: string }).id); await assertProcessAccess(processId, user);
+    const { tipo } = z.object({ tipo: z.string().optional() }).parse(request.query); if (tipo && !fileTipos.has(tipo)) throw fail(400, 'Tipo de archivo no válido.');
     const upload = await request.file(); if (!upload) throw fail(400, 'Debes adjuntar un archivo.');
     const saved = await saveUpload(upload.filename, upload.file);
     const detectedMime = sniffMime(saved.header); const mimeType = detectedMime ?? upload.mimetype.toLowerCase();
     if (upload.file.truncated || saved.sizeBytes === 0 || !allowedMimes.has(mimeType) || (detectedMime && upload.mimetype !== 'application/octet-stream' && upload.mimetype !== detectedMime)) { await removeStoredFile(saved.storageKey); throw fail(400, 'Archivo inválido, vacío, demasiado grande o de formato no permitido.'); }
     try {
-      const file = await prisma.file.create({ data: { processId, originalName: upload.filename, storageKey: saved.storageKey, mimeType, sizeBytes: saved.sizeBytes, sha256: saved.sha256, uploadedBy: user.id } });
+      const file = await prisma.file.create({ data: { processId, originalName: upload.filename, storageKey: saved.storageKey, mimeType, sizeBytes: saved.sizeBytes, sha256: saved.sha256, tipo: tipo ?? null, uploadedBy: user.id } });
       await prisma.process.update({ where: { id: processId }, data: { status: 'files_uploaded' } }); await audit(user.id, 'upload', 'file', file.id, file.originalName); return file;
     } catch (error) { await removeStoredFile(saved.storageKey); throw error; }
   });

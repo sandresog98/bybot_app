@@ -1,5 +1,5 @@
 import { config } from '../config.js';
-import { EXTRACTION_PROMPT, type AIProvider, type AiResult, type AnalyzeInput } from './types.js';
+import type { AIProvider, AiResult, AnalyzeInput } from './types.js';
 
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -10,7 +10,7 @@ export class GeminiProvider implements AIProvider {
     return mimeType === 'application/pdf' || mimeType.startsWith('image/');
   }
 
-  async analyze(input: AnalyzeInput): Promise<AiResult> {
+  async analyze(input: AnalyzeInput, prompt: string): Promise<AiResult> {
     if (!config.GEMINI_API_KEY || !config.GEMINI_MODEL) {
       throw new Error('El análisis IA con Gemini no está configurado. Define GEMINI_API_KEY y GEMINI_MODEL.');
     }
@@ -38,7 +38,7 @@ export class GeminiProvider implements AIProvider {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          systemInstruction: { parts: [{ text: EXTRACTION_PROMPT }] },
+          systemInstruction: { parts: [{ text: prompt }] },
           contents: [{ role: 'user', parts }],
           generationConfig,
         }),
