@@ -65,30 +65,32 @@ export function ClientsPage() {
             Nuevo cliente
           </button>
         </div>
-        <table className="data-table">
-          <thead>
-            <tr><th>Código</th><th>Nombre</th><th>NIT</th><th>Estado</th><th className="row-actions" /></tr>
-          </thead>
-          <tbody>
-            {entidades.length === 0 && <tr><td colSpan={5} className="placeholder">Aún no hay clientes.</td></tr>}
-            {entidades.map(entidad => (
-              <tr key={entidad.id}>
-                <td>{entidad.codigo}</td>
-                <td>{entidad.nombre}</td>
-                <td>{entidad.nit ?? '—'}</td>
-                <td>{entidad.active === false ? 'Inactivo' : 'Activo'}</td>
-                <td className="row-actions">
-                  <button type="button" className="icon-btn" title="Editar" onClick={() => setEditing(entidad)}>
-                    <Pencil size={15} aria-hidden />
-                  </button>
-                  <button type="button" className={entidad.active === false ? 'icon-btn' : 'icon-btn danger'} title={entidad.active === false ? 'Activar' : 'Desactivar'} onClick={() => void toggleActive(entidad)}>
-                    <Power size={15} aria-hidden />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="table-scroll">
+          <table className="data-table">
+            <thead>
+              <tr><th>Código</th><th>Nombre</th><th>NIT</th><th>Estado</th><th className="row-actions" /></tr>
+            </thead>
+            <tbody>
+              {entidades.length === 0 && <tr><td colSpan={5} className="placeholder">Aún no hay clientes.</td></tr>}
+              {entidades.map(entidad => (
+                <tr key={entidad.id}>
+                  <td>{entidad.codigo}</td>
+                  <td>{entidad.nombre}</td>
+                  <td>{entidad.nit ?? '—'}</td>
+                  <td>{entidad.active === false ? 'Inactivo' : 'Activo'}</td>
+                  <td className="row-actions">
+                    <button type="button" className="icon-btn" title="Editar" onClick={() => setEditing(entidad)}>
+                      <Pencil size={15} aria-hidden />
+                    </button>
+                    <button type="button" className={entidad.active === false ? 'icon-btn' : 'icon-btn danger'} title={entidad.active === false ? 'Activar' : 'Desactivar'} onClick={() => void toggleActive(entidad)}>
+                      <Power size={15} aria-hidden />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       {creating && (

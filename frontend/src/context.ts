@@ -1,10 +1,13 @@
 import { createContext, useContext } from 'react';
 import type { ToastType, User } from './types';
+import type { Theme } from './theme';
 
 export type AppContextValue = {
   user: User;
   toast: (type: ToastType, message: string) => void;
   logout: () => void;
+  theme: Theme;
+  toggleTheme: () => void;
 };
 
 export const AppContext = createContext<AppContextValue | null>(null);

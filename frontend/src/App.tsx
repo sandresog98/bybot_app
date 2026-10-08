@@ -10,6 +10,8 @@ import { ClientsPage } from './pages/ClientsPage';
 import { ProcessDetailPage } from './pages/ProcessDetailPage';
 import { ProcessesPage } from './pages/ProcessesPage';
 import { UsersPage } from './pages/UsersPage';
+import { applyTheme, getInitialTheme } from './theme';
+import type { Theme } from './theme';
 import type { Toast, ToastType, User } from './types';
 
 let nextToastId = 0;
@@ -20,6 +22,10 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | undefined>();
   const [checking, setChecking] = useState(true);
+  const [theme, setTheme] = useState<Theme>(() => getInitialTheme());
+
+  useEffect(() => { applyTheme(theme); }, [theme]);
+  const toggleTheme = () => setTheme(current => (current === 'dark' ? 'light' : 'dark'));
 
   const toast = (type: ToastType, msg: string) => {
     const id = ++nextToastId;
@@ -44,7 +50,7 @@ export function App() {
   if (!user) return <Login onSubmit={login} busy={busy} message={message} />;
 
   return (
-    <AppContext.Provider value={{ user, toast, logout }}>
+    <AppContext.Provider value={{ user, toast, logout, theme, toggleTheme }}>
       <Routes>
         <Route element={<AppShell />}>
           <Route index element={<Home />} />

@@ -36,4 +36,12 @@ describe('App', () => {
     expect(api.logout).toHaveBeenCalled();
     expect(await screen.findByRole('button', { name: 'Ingresar' })).toBeInTheDocument();
   });
+
+  it('cambia el tema al pulsar el botón', async () => {
+    vi.mocked(api.me).mockResolvedValue(admin);
+    renderApp();
+    const toggle = await screen.findByRole('button', { name: 'Cambiar tema' });
+    await userEvent.click(toggle);
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+  });
 });

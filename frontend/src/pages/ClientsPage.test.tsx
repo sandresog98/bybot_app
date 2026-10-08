@@ -8,7 +8,7 @@ import { ClientsPage } from './ClientsPage';
 vi.mock('../api', () => ({ api: { listEntidades: vi.fn(), createEntidad: vi.fn(), updateEntidad: vi.fn() } }));
 
 const renderPage = () => render(
-  <AppContext.Provider value={{ user: { id: 1, username: 'admin', name: 'Admin', role: 'admin', active: true }, toast: vi.fn(), logout: vi.fn() }}>
+  <AppContext.Provider value={{ user: { id: 1, username: 'admin', name: 'Admin', role: 'admin', active: true }, toast: vi.fn(), logout: vi.fn(), theme: 'light', toggleTheme: vi.fn() }}>
     <ClientsPage />
   </AppContext.Provider>,
 );

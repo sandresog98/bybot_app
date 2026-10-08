@@ -1,5 +1,5 @@
 {
-  "name": "@bybot/node2-frontend",
+  "name": "@bybot/frontend",
   "private": true,
   "type": "module",
   "scripts": {

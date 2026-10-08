@@ -50,29 +50,31 @@ export function UsersPanel({ users, busy, onSubmit, onUpdate }: Props) {
         </button>
       </div>
 
-      <table className="data-table">
-        <thead>
-          <tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Estado</th><th /></tr>
-        </thead>
-        <tbody>
-          {users.length === 0 && <tr><td colSpan={5} className="placeholder">Aún no hay usuarios.</td></tr>}
-          {users.map(user => (
-            <tr key={user.id}>
-              <td>{user.name}</td>
-              <td>{user.username}</td>
-              <td>{user.role}</td>
-              <td>{user.active ? 'Activo' : 'Inactivo'}</td>
-              <td className="row-actions">
-                {onUpdate && (
-                  <button type="button" className="icon-btn" title="Editar" onClick={() => setEditing(user)}>
-                    <Pencil size={15} aria-hidden />
-                  </button>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="table-scroll">
+        <table className="data-table">
+          <thead>
+            <tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Estado</th><th /></tr>
+          </thead>
+          <tbody>
+            {users.length === 0 && <tr><td colSpan={5} className="placeholder">Aún no hay usuarios.</td></tr>}
+            {users.map(user => (
+              <tr key={user.id}>
+                <td>{user.name}</td>
+                <td>{user.username}</td>
+                <td>{user.role}</td>
+                <td>{user.active ? 'Activo' : 'Inactivo'}</td>
+                <td className="row-actions">
+                  {onUpdate && (
+                    <button type="button" className="icon-btn" title="Editar" onClick={() => setEditing(user)}>
+                      <Pencil size={15} aria-hidden />
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {creating && (
         <Modal title="Nuevo usuario" onClose={() => setCreating(false)}>

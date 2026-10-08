@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { Plus, Search, X } from 'lucide-react';
+import { Eye, Plus, Search, X } from 'lucide-react';
 import { PROCESS_STATUS_OPTIONS, statusLabel } from '../status';
 import { Modal } from './Modal';
 import type { Entidad, Process } from '../types';
@@ -65,29 +65,45 @@ export function ProcessList({ processes, entidades, busy, onSelect, onCreate, fi
         </div>
       )}
 
-      <ul className="process-list">
-        {processes.length === 0 && <p className="placeholder">No hay procesos que coincidan.</p>}
-        {processes.map(process => {
-          const hasDeudor = Boolean(process.deudorNombre || process.deudorDocumento);
-          return (
-            <li key={process.id}>
-              <button className="process" onClick={() => onSelect(process.id)}>
-                <b>{process.code}</b>
-                <span className="title">{process.title}</span>
-                <small>
-                  <span className="status" data-status={process.status}>{statusLabel(process.status)}</span>
-                  {process.entidad ? process.entidad.nombre : 'Sin cliente'} · {process._count?.files ?? 0} archivos
-                </small>
-                <small className={hasDeudor ? 'deudor' : 'deudor muted'}>
-                  {hasDeudor
-                    ? `${process.deudorNombre ?? 'Deudor sin nombre'}${process.deudorDocumento ? ` · C.C. ${process.deudorDocumento}` : ''}`
-                    : 'Sin datos de deudor (analiza o consolida)'}
-                </small>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="table-scroll">
+        <table className="data-table process-table">
+          <thead>
+            <tr>
+              <th>Código</th><th>Título</th><th>Cliente</th><th>Deudor</th><th>Estado</th><th>Archivos</th><th className="row-actions" />
+            </tr>
+          </thead>
+          <tbody>
+            {processes.length === 0 && <tr><td colSpan={7} className="placeholder">No hay procesos que coincidan.</td></tr>}
+            {processes.map(process => {
+              const hasDeudor = Boolean(process.deudorNombre || process.deudorDocumento);
+              return (
+                <tr key={process.id} className="row-clickable" onClick={() => onSelect(process.id)}>
+                  <td data-label="Código"><b>{process.code}</b></td>
+                  <td data-label="Título">{process.title}</td>
+                  <td data-label="Cliente">{process.entidad ? process.entidad.nombre : 'Sin cliente'}</td>
+                  <td data-label="Deudor" className={hasDeudor ? undefined : 'muted'}>
+                    {hasDeudor
+                      ? `${process.deudorNombre ?? 'Deudor sin nombre'}${process.deudorDocumento ? ` · C.C. ${process.deudorDocumento}` : ''}`
+                      : 'Sin datos de deudor'}
+                  </td>
+                  <td data-label="Estado"><span className="status" data-status={process.status}>{statusLabel(process.status)}</span></td>
+                  <td data-label="Archivos">{process._count?.files ?? 0}</td>
+                  <td className="row-actions">
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      title="Ver"
+                      onClick={event => { event.stopPropagation(); onSelect(process.id); }}
+                    >
+                      <Eye size={16} aria-hidden />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
       {creating && (
         <Modal title="Nuevo proceso" onClose={() => setCreating(false)}>

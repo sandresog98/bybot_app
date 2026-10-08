@@ -15,8 +15,9 @@ const entidades: Entidad[] = [
 ];
 
 describe('ProcessList', () => {
-  it('muestra los procesos, su estado amigable, cliente y deudor', () => {
+  it('muestra los procesos en una tabla con estado amigable, cliente y deudor', () => {
     render(<ProcessList processes={processes} entidades={entidades} busy={false} onSelect={vi.fn()} onCreate={vi.fn()} />);
+    expect(screen.getByRole('table')).toBeInTheDocument();
     expect(screen.getByText('Proceso A')).toBeInTheDocument();
     expect(screen.getByText('Proceso B')).toBeInTheDocument();
     expect(screen.getByText('Creado')).toBeInTheDocument();

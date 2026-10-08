@@ -1,5 +1,5 @@
 {
-  "name": "@bybot/node2-backend",
+  "name": "@bybot/backend",
   "private": true,
   "type": "module",
   "scripts": {

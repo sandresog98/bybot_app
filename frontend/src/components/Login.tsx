@@ -19,9 +19,9 @@ export function Login({ onSubmit, busy, message }: Props) {
     <main className="login">
       <form onSubmit={handle} className="login-form">
         <div className="login-brand">
-          <div className="app-logo">N2</div>
-          <h1>Node2</h1>
-          <p>Procesos y análisis IA</p>
+          <img className="logo logo-light login-logo" src="/bybot-logo-light.png" alt="ByBot" />
+          <img className="logo logo-dark login-logo" src="/bybot-logo-dark.png" alt="ByBot" />
+          <p className="login-tagline">ByB Jurídicos</p>
         </div>
         <label className="login-field">
           Usuario
@@ -33,6 +33,7 @@ export function Login({ onSubmit, busy, message }: Props) {
         </label>
         <button type="submit" disabled={busy}>{busy ? 'Ingresando…' : 'Ingresar'}</button>
         {message && <p className="notice">{message}</p>}
+        <img className="login-company-logo" src="/byb-logo.png" alt="ByB Jurídicos" />
       </form>
     </main>
   );

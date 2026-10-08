@@ -1,6 +1,6 @@
-# Node2
+# ByBot
 
-Aplicación para **gestión de usuarios, procesos, archivos y análisis con IA**, con **normalización de archivos**, **consolidación por proceso**, **almacenamiento estructurado** y **liquidación de demandas**. No contiene bots, automatizaciones web, `botworker` ni el microservicio `botstorage`.
+Aplicación **ByBot**, de **ByB Jurídicos**, para **gestión de usuarios, procesos, archivos y análisis con IA**, con **normalización de archivos**, **consolidación por proceso**, **almacenamiento estructurado** y **liquidación de demandas**. No contiene bots, automatizaciones web, `botworker` ni el microservicio `botstorage`.
 
 ## Arquitectura
 

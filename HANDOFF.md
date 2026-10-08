@@ -1,4 +1,4 @@
-# HANDOFF — Estado del proyecto y siguientes pasos
+# HANDOFF — ByBot (ByB Jurídicos) · Estado del proyecto y siguientes pasos
 
 > Documento de traspaso para continuar el desarrollo en otra consola/sesión.
 > Última actualización: 2026-10-08.

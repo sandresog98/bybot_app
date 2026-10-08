@@ -1,6 +1,6 @@
 # Despliegue: MariaDB, archivos locales y Docker
 
-Esta es la arquitectura inicial de Node2. La API y el worker son contenedores independientes; MariaDB es externo y los archivos viven en un volumen Docker persistente compartido.
+Esta es la arquitectura inicial de ByBot. La API y el worker son contenedores independientes; MariaDB es externo y los archivos viven en un volumen Docker persistente compartido.
 
 ```text
 Navegador → Frontend (Nginx) → API ─→ MariaDB
