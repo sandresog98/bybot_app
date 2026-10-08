@@ -11,12 +11,14 @@ import { requireAdmin, requireUser, signToken, type AuthUser } from './auth.js';
 import { Prisma } from '@prisma/client';
 import { config } from './config.js';
 import { prisma } from './db.js';
-import { initializeStorage, readStoredFile, removeStoredFile, saveUpload } from './storage.js';
+import { initializeStorage, readStoredFile, removeStoredFile, saveBuffer } from './storage.js';
+import { normalizeUpload, UnsupportedFileError } from './ingest/normalize.js';
+import { normalizeProcess } from './normalize.js';
+import { liquidarDemanda, tipoDemandaPorProducto } from './demanda/liquidacion.js';
 import { FILE_TIPOS } from './ai/prompts.js';
 
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 const publicUser = ({ id, username, name, role, active }: { id: number; username: string; name: string; role: string; active: boolean }) => ({ id, username, name, role, active });
-const allowedMimes = new Set(['application/pdf', 'text/plain', 'text/csv', 'application/json', 'image/jpeg', 'image/png']);
 const fileTipos = new Set<string>(FILE_TIPOS);
 const paginationSchema = z.object({ page: z.coerce.number().int().positive().default(1), limit: z.coerce.number().int().min(1).max(100).default(25) });
 
@@ -32,6 +34,10 @@ function sniffMime(header: Buffer) {
   if (header.subarray(0, 4).equals(Buffer.from('%PDF'))) return 'application/pdf';
   if (header.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
   if (header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff) return 'image/jpeg';
+  if (header[0] === 0x42 && header[1] === 0x4d) return 'image/bmp';
+  if (header[0] === 0x47 && header[1] === 0x49 && header[2] === 0x46) return 'image/gif';
+  if (header[0] === 0x49 && header[1] === 0x49 && header[2] === 0x2a && header[3] === 0x00) return 'image/tiff';
+  if (header[0] === 0x4d && header[1] === 0x4d && header[2] === 0x00 && header[3] === 0x2a) return 'image/tiff';
   return null;
 }
 async function assertProcessAccess(processId: number, user: AuthUser) {
@@ -45,6 +51,26 @@ async function fileWithAccess(fileId: number, user: AuthUser) {
   if (!file) throw fail(404, 'Archivo no encontrado.');
   await assertProcessAccess(file.processId, user);
   return file;
+}
+async function readUpload(request: FastifyRequest) {
+  const upload = await request.file();
+  if (!upload) throw fail(400, 'Debes adjuntar un archivo.');
+  const chunks: Buffer[] = [];
+  for await (const chunk of upload.file) chunks.push(Buffer.from(chunk));
+  const original = Buffer.concat(chunks);
+  if (upload.file.truncated || original.length === 0) throw fail(400, 'Archivo inválido, vacío o demasiado grande.');
+  const declaredMime = upload.mimetype.toLowerCase();
+  const detectedMime = sniffMime(original.subarray(0, 4_100));
+  let normalized;
+  try {
+    normalized = await normalizeUpload({ originalName: upload.filename, declaredMime, detectedMime, content: original });
+  } catch (error) {
+    if (error instanceof UnsupportedFileError) throw fail(422, error.message);
+    throw error;
+  }
+  const dot = upload.filename.lastIndexOf('.');
+  const base = dot > 0 ? upload.filename.slice(0, dot) : upload.filename;
+  return { originalName: upload.filename, storedName: `${base}.${normalized.extension}`, normalized, originalMime: detectedMime ?? declaredMime };
 }
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -116,15 +142,26 @@ export async function buildApp(): Promise<FastifyInstance> {
     const user = await requireUser(request); const id = z.coerce.number().int().parse((request.params as { id: string }).id); await assertProcessAccess(id, user);
     return prisma.process.findUniqueOrThrow({ where: { id }, include: { files: { orderBy: { createdAt: 'desc' } }, analyses: { orderBy: { createdAt: 'desc' } }, creator: { select: { name: true } }, entidad: { select: { codigo: true, nombre: true } } } });
   });
+  app.get('/api/processes/:id/structured', async (request) => {
+    const user = await requireUser(request); const id = z.coerce.number().int().parse((request.params as { id: string }).id); await assertProcessAccess(id, user);
+    const [partes, credito, campos] = await prisma.$transaction([
+      prisma.parte.findMany({ where: { processId: id }, orderBy: { id: 'asc' } }),
+      prisma.credito.findFirst({ where: { processId: id } }),
+      prisma.extraccionCampo.findMany({ where: { processId: id }, orderBy: { id: 'asc' } }),
+    ]);
+    const [movimientos, cuotas] = await prisma.$transaction([
+      prisma.movimiento.findMany({ where: { processId: id }, orderBy: { orden: 'asc' } }),
+      prisma.cuotaAmortizacion.findMany({ where: { processId: id }, orderBy: { id: 'asc' } }),
+    ]);
+    return { partes, credito, movimientos, cuotas, campos };
+  });
   app.post('/api/processes/:id/files', async (request) => {
     const user = await requireUser(request); const processId = z.coerce.number().int().parse((request.params as { id: string }).id); await assertProcessAccess(processId, user);
     const { tipo } = z.object({ tipo: z.string().optional() }).parse(request.query); if (tipo && !fileTipos.has(tipo)) throw fail(400, 'Tipo de archivo no válido.');
-    const upload = await request.file(); if (!upload) throw fail(400, 'Debes adjuntar un archivo.');
-    const saved = await saveUpload(upload.filename, upload.file);
-    const detectedMime = sniffMime(saved.header); const mimeType = detectedMime ?? upload.mimetype.toLowerCase();
-    if (upload.file.truncated || saved.sizeBytes === 0 || !allowedMimes.has(mimeType) || (detectedMime && upload.mimetype !== 'application/octet-stream' && upload.mimetype !== detectedMime)) { await removeStoredFile(saved.storageKey); throw fail(400, 'Archivo inválido, vacío, demasiado grande o de formato no permitido.'); }
+    const { storedName, normalized, originalMime } = await readUpload(request);
+    const saved = await saveBuffer(storedName, normalized.buffer, normalized.extension);
     try {
-      const file = await prisma.file.create({ data: { processId, originalName: upload.filename, storageKey: saved.storageKey, mimeType, sizeBytes: saved.sizeBytes, sha256: saved.sha256, tipo: tipo ?? null, uploadedBy: user.id } });
+      const file = await prisma.file.create({ data: { processId, originalName: storedName, storageKey: saved.storageKey, mimeType: normalized.mimeType, sizeBytes: saved.sizeBytes, sha256: saved.sha256, originalMimeType: originalMime, converted: normalized.converted, tipo: tipo ?? null, uploadedBy: user.id } });
       await prisma.process.update({ where: { id: processId }, data: { status: 'files_uploaded' } }); await audit(user.id, 'upload', 'file', file.id, file.originalName); return file;
     } catch (error) { await removeStoredFile(saved.storageKey); throw error; }
   });
@@ -132,9 +169,30 @@ export async function buildApp(): Promise<FastifyInstance> {
     const user = await requireUser(request); const id = z.coerce.number().int().parse((request.params as { id: string }).id); const file = await fileWithAccess(id, user); const content = await readStoredFile(file.storageKey);
     await audit(user.id, 'download', 'file', file.id); return reply.type(file.mimeType).header('Content-Disposition', `attachment; filename="${file.originalName.replace(/"/g, '')}"`).send(content);
   });
+  app.get('/api/files/:id/view', async (request, reply) => {
+    const user = await requireUser(request); const id = z.coerce.number().int().parse((request.params as { id: string }).id); const file = await fileWithAccess(id, user); const content = await readStoredFile(file.storageKey);
+    await audit(user.id, 'view', 'file', file.id); return reply.type(file.mimeType).header('Content-Disposition', `inline; filename="${file.originalName.replace(/"/g, '')}"`).send(content);
+  });
   app.delete('/api/files/:id', async (request) => {
     const user = await requireUser(request); const id = z.coerce.number().int().parse((request.params as { id: string }).id); const file = await fileWithAccess(id, user);
     await prisma.file.delete({ where: { id } }); try { await removeStoredFile(file.storageKey); } catch { await audit(user.id, 'storage_cleanup_failed', 'file', file.id); } await audit(user.id, 'delete', 'file', file.id); return { ok: true };
+  });
+  app.put('/api/processes/:id/files/:fileId', async (request) => {
+    const user = await requireUser(request);
+    const processId = z.coerce.number().int().parse((request.params as { id: string }).id);
+    const fileId = z.coerce.number().int().parse((request.params as { fileId: string }).fileId);
+    await assertProcessAccess(processId, user);
+    const existing = await prisma.file.findFirst({ where: { id: fileId, processId } });
+    if (!existing) throw fail(404, 'Archivo no encontrado en este proceso.');
+    const { tipo } = z.object({ tipo: z.string().optional() }).parse(request.query); if (tipo && !fileTipos.has(tipo)) throw fail(400, 'Tipo de archivo no válido.');
+    const { storedName, normalized, originalMime } = await readUpload(request);
+    const saved = await saveBuffer(storedName, normalized.buffer, normalized.extension);
+    try {
+      const file = await prisma.file.update({ where: { id: existing.id }, data: { originalName: storedName, storageKey: saved.storageKey, mimeType: normalized.mimeType, sizeBytes: saved.sizeBytes, sha256: saved.sha256, originalMimeType: originalMime, converted: normalized.converted, tipo: tipo ?? existing.tipo } });
+      try { await removeStoredFile(existing.storageKey); } catch { await audit(user.id, 'storage_cleanup_failed', 'file', existing.id); }
+      await audit(user.id, 'replace', 'file', file.id, file.originalName);
+      return file;
+    } catch (error) { await removeStoredFile(saved.storageKey); throw error; }
   });
   app.post('/api/processes/:id/analyze', async (request) => {
     const user = await requireUser(request); const processId = z.coerce.number().int().parse((request.params as { id: string }).id); await assertProcessAccess(processId, user);
@@ -142,12 +200,76 @@ export async function buildApp(): Promise<FastifyInstance> {
     if (!file) throw fail(400, 'El proceso no tiene archivos para analizar.');
     const analysis = await prisma.analysis.create({ data: { processId, fileId: file.id, status: 'queued', provider: config.AI_PROVIDER, model: config.AI_PROVIDER === 'gemini' ? config.GEMINI_MODEL : config.AI_MODEL || null } }); await prisma.process.update({ where: { id: processId }, data: { status: 'analysis_queued' } }); await audit(user.id, 'queue_analysis', 'analysis', analysis.id); return analysis;
   });
+  app.post('/api/processes/:id/analyze-all', async (request) => {
+    const user = await requireUser(request); const processId = z.coerce.number().int().parse((request.params as { id: string }).id); await assertProcessAccess(processId, user);
+    const files = await prisma.file.findMany({ where: { processId }, orderBy: { createdAt: 'asc' } });
+    if (files.length === 0) throw fail(400, 'El proceso no tiene archivos para analizar.');
+    const provider = config.AI_PROVIDER; const model = provider === 'gemini' ? config.GEMINI_MODEL : config.AI_MODEL || null;
+    let queued = 0; let skipped = 0;
+    for (const file of files) {
+      const latest = await prisma.analysis.findFirst({ where: { fileId: file.id }, orderBy: { createdAt: 'desc' } });
+      if (latest && ['queued', 'running', 'completed'].includes(latest.status)) { skipped += 1; continue; }
+      await prisma.analysis.create({ data: { processId, fileId: file.id, status: 'queued', provider, model } });
+      queued += 1;
+    }
+    if (queued > 0) await prisma.process.update({ where: { id: processId }, data: { status: 'analysis_queued' } });
+    await audit(user.id, 'queue_analysis_bulk', 'process', processId, `queued=${queued} skipped=${skipped}`);
+    return { queued, skipped, total: files.length };
+  });
+  app.post('/api/processes/:id/consolidate', async (request) => {
+    const user = await requireUser(request); const processId = z.coerce.number().int().parse((request.params as { id: string }).id); await assertProcessAccess(processId, user);
+    const pending = await prisma.analysis.findFirst({ where: { processId, scope: 'process', status: { in: ['queued', 'running'] } }, orderBy: { createdAt: 'desc' } });
+    if (pending) return pending;
+    const completed = await prisma.analysis.count({ where: { processId, scope: 'file', status: 'completed' } });
+    if (completed === 0) throw fail(400, 'Analiza primero al menos un archivo antes de consolidar.');
+    const analysis = await prisma.analysis.create({ data: { processId, fileId: null, scope: 'process', status: 'queued', provider: 'consolidator', model: null } });
+    await prisma.process.update({ where: { id: processId }, data: { status: 'analysis_queued' } });
+    await audit(user.id, 'queue_consolidation', 'process', processId);
+    return analysis;
+  });
+  app.post('/api/processes/:id/liquidacion', async (request) => {
+    const user = await requireUser(request); const processId = z.coerce.number().int().parse((request.params as { id: string }).id); await assertProcessAccess(processId, user);
+    const body = z.object({
+      cuotaInicial: z.number().int().positive(),
+      cuotaCorte: z.number().int().positive(),
+      overridesCapital: z.record(z.string(), z.number()).optional(),
+      interesesMora: z.number().optional(),
+    }).parse(request.body ?? {});
+    const credito = await prisma.credito.findFirst({ where: { processId } });
+    const cuotas = await prisma.cuotaAmortizacion.findMany({ where: { processId }, orderBy: { numero: 'asc' } });
+    if (cuotas.length === 0) throw fail(400, 'No hay cuotas de amortización para el proceso. Consolida el análisis primero.');
+    const overridesCapital: Record<number, number> = {};
+    for (const [key, value] of Object.entries(body.overridesCapital ?? {})) overridesCapital[Number(key)] = value;
+    const result = liquidarDemanda({
+      cuotas: cuotas.map(cuota => ({
+        numero: cuota.numero, fecha: cuota.fecha,
+        cuota: cuota.cuota?.toNumber() ?? null,
+        abonoCapital: cuota.abonoCapital?.toNumber() ?? null,
+        abonoInteres: cuota.abonoInteres?.toNumber() ?? null,
+        saldo: cuota.saldo?.toNumber() ?? null,
+      })),
+      cuotaInicial: body.cuotaInicial,
+      cuotaCorte: body.cuotaCorte,
+      overridesCapital,
+      interesesMora: body.interesesMora ?? null,
+      saldoCapitalExtracto: credito?.saldoCapital?.toNumber() ?? null,
+      totalDeudaExtracto: credito?.totalDeuda?.toNumber() ?? null,
+      smlmv: config.SMLMV,
+      umbralMinimaSmlmv: config.UMBRAL_MINIMA_SMLMV,
+    });
+    await audit(user.id, 'liquidar', 'process', processId);
+    return { ...result, tipoDemanda: tipoDemandaPorProducto(credito?.producto) };
+  });
   app.post('/api/analyses/:id/retry', async (request) => { const user = await requireUser(request); const id = z.coerce.number().int().parse((request.params as { id: string }).id); const analysis = await prisma.analysis.findUnique({ where: { id } }); if (!analysis) throw fail(404, 'Análisis no encontrado.'); await assertProcessAccess(analysis.processId, user); if (analysis.status !== 'failed' || analysis.attempts >= analysis.maxAttempts) throw fail(409, 'El análisis no se puede reintentar.'); return prisma.analysis.update({ where: { id }, data: { status: 'queued', error: null } }); });
   app.post('/api/analyses/:id/validar', async (request) => {
     const user = await requireUser(request); const id = z.coerce.number().int().parse((request.params as { id: string }).id);
     const analysis = await prisma.analysis.findUnique({ where: { id } }); if (!analysis) throw fail(404, 'Análisis no encontrado.'); await assertProcessAccess(analysis.processId, user);
     const body = z.object({ datos: z.record(z.string(), z.unknown()) }).parse(request.body);
     await prisma.analysis.update({ where: { id }, data: { validated: body.datos as Prisma.InputJsonValue } });
+    if (analysis.scope === 'process') {
+      try { await normalizeProcess(prisma, analysis.processId, analysis.id, body.datos); }
+      catch (error) { await audit(user.id, 'normalize_failed', 'process', analysis.processId, error instanceof Error ? error.message : undefined); }
+    }
     await audit(user.id, 'validate', 'analysis', id); return { ok: true };
   });
 

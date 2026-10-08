@@ -19,8 +19,7 @@ export function ProcessList({ processes, entidades, busy, onSelect, onCreate }: 
   };
 
   return (
-    <aside>
-      <h2>Procesos</h2>
+    <div className="section-card">
       <form onSubmit={handle} className="inline">
         <input name="title" placeholder="Nombre del proceso" required />
         <select name="entidadId" defaultValue="0">
@@ -29,7 +28,8 @@ export function ProcessList({ processes, entidades, busy, onSelect, onCreate }: 
         </select>
         <button type="submit" disabled={busy}>{busy ? 'Creando…' : 'Crear'}</button>
       </form>
-      <ul>
+      <ul className="process-list">
+        {processes.length === 0 && <p className="placeholder">Aún no hay procesos. Crea el primero.</p>}
         {processes.map(process => (
           <li key={process.id}>
             <button className="process" onClick={() => onSelect(process.id)}>
@@ -43,6 +43,6 @@ export function ProcessList({ processes, entidades, busy, onSelect, onCreate }: 
           </li>
         ))}
       </ul>
-    </aside>
+    </div>
   );
 }

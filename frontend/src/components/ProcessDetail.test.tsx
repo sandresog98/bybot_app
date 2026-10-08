@@ -16,10 +16,18 @@ const detail: Detail = {
 
 const baseProps = {
   selected: detail,
+  structured: null,
   busyUpload: false,
   busyAnalyze: false,
+  busyAnalyzeAll: false,
+  busyConsolidate: false,
   onUpload: vi.fn().mockResolvedValue(undefined),
   onAnalyze: vi.fn().mockResolvedValue(undefined),
+  onAnalyzeAll: vi.fn().mockResolvedValue(undefined),
+  onConsolidate: vi.fn().mockResolvedValue(undefined),
+  onDelete: vi.fn().mockResolvedValue(undefined),
+  onReplace: vi.fn().mockResolvedValue(undefined),
+  onView: vi.fn(),
   onDownload: vi.fn(),
   onValidar: vi.fn().mockResolvedValue(undefined),
 };
@@ -44,6 +52,13 @@ describe('ProcessDetail', () => {
     expect(baseProps.onDownload).toHaveBeenCalledWith(7, 'extracto.pdf');
   });
 
+  it('abre la vista previa del archivo', async () => {
+    const onView = vi.fn();
+    render(<ProcessDetail {...baseProps} onView={onView} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Ver' }));
+    expect(onView).toHaveBeenCalledWith(7, 'extracto.pdf');
+  });
+
   it('envía el archivo elegido al subir', async () => {
     const props = { ...baseProps, onUpload: vi.fn().mockResolvedValue(undefined) };
     const { container } = render(<ProcessDetail {...props} />);
@@ -61,5 +76,46 @@ describe('ProcessDetail', () => {
     expect(screen.getByText('Resumen')).toBeInTheDocument();
     expect(screen.getByText('ok')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Editar' })).toBeInTheDocument();
+  });
+
+  it('ofrece analizar todos los archivos y eliminar con confirmación', async () => {
+    const onAnalyzeAll = vi.fn().mockResolvedValue(undefined);
+    const onDelete = vi.fn().mockResolvedValue(undefined);
+    render(<ProcessDetail {...baseProps} onAnalyzeAll={onAnalyzeAll} onDelete={onDelete} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Analizar todos los archivos IA' }));
+    expect(onAnalyzeAll).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+    expect(onDelete).toHaveBeenCalledWith(7);
+  });
+
+  it('agrupa por archivo y muestra el historial de ejecuciones', () => {
+    const withHistory: Detail = {
+      ...detail,
+      analyses: [
+        { id: 12, status: 'completed', fileId: 7, result: { resumen: 'nuevo' } },
+        { id: 6, status: 'failed', fileId: 7, error: 'timeout' },
+      ],
+    };
+    render(<ProcessDetail {...baseProps} selected={withHistory} />);
+    expect(screen.getByText('nuevo')).toBeInTheDocument();
+    expect(screen.getByText(/Historial de ejecuciones \(2\)/)).toBeInTheDocument();
+  });
+
+  it('permite encolar la consolidación del proceso', async () => {
+    const onConsolidate = vi.fn().mockResolvedValue(undefined);
+    render(<ProcessDetail {...baseProps} onConsolidate={onConsolidate} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Consolidar análisis del proceso' }));
+    expect(onConsolidate).toHaveBeenCalledTimes(1);
+  });
+
+  it('muestra los datos estructurados del proceso', () => {
+    const structured = {
+      partes: [{ id: 1, rol: 'deudor', orden: 0, nombreCompleto: 'Ana Pérez', numeroDocumento: '123' }],
+      credito: null, movimientos: [], cuotas: [], campos: [],
+    };
+    render(<ProcessDetail {...baseProps} structured={structured} />);
+    expect(screen.getByText('Ana Pérez')).toBeInTheDocument();
+    expect(screen.getByText('Deudor')).toBeInTheDocument();
   });
 });

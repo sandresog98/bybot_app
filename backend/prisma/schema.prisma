@@ -43,6 +43,11 @@ model Process {
   entidad   Entidad?  @relation(fields: [entidadId], references: [id])
   files     File[]
   analyses  Analysis[]
+  partes    Parte[]
+  credito   Credito?
+  movimientos Movimiento[]
+  cuotas    CuotaAmortizacion[]
+  campos    ExtraccionCampo[]
 }
 
 model File {
@@ -51,6 +56,8 @@ model File {
   originalName String
   storageKey   String   @unique
   mimeType     String
+  originalMimeType String?
+  converted    Boolean  @default(false)
   sizeBytes    Int
   sha256       String
   tipo         String?
@@ -66,6 +73,7 @@ model Analysis {
   id           Int      @id @default(autoincrement())
   processId    Int
   fileId       Int?
+  scope        String   @default("file")
   status       String   @default("pending")
   provider     String?
   model        String?
@@ -98,4 +106,124 @@ model AuditEvent {
 
   @@index([resource, resourceId])
   @@index([userId, createdAt])
+}
+
+model Parte {
+  id                Int      @id @default(autoincrement())
+  processId         Int
+  rol               String
+  orden             Int      @default(0)
+  tipoDocumento     String?
+  numeroDocumento   String?
+  nombreCompleto    String?
+  fechaExpedicion   DateTime?
+  lugarExpedicion   String?
+  fechaNacimiento   DateTime?
+  direccion         String?
+  ciudad            String?
+  departamento      String?
+  telefono          String?
+  celular           String?
+  email             String?
+  ocupacion         String?
+  empresa           String?
+  ingresosMensuales Decimal? @db.Decimal(18, 2)
+  relacionDeudor    String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  process           Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
+
+  @@index([processId, rol])
+  @@index([numeroDocumento])
+}
+
+model Credito {
+  id                       Int      @id @default(autoincrement())
+  processId                Int      @unique
+  entidadId                Int?
+  numeroCredito            String?
+  numeroPagare             String?
+  producto                 String?
+  monto                    Decimal? @db.Decimal(18, 2)
+  plazoMeses               Int?
+  tasaEa                   Decimal? @db.Decimal(9, 4)
+  tasaInteresCorriente     Decimal? @db.Decimal(9, 4)
+  tasaInteresMora          Decimal? @db.Decimal(9, 4)
+  fechaDesembolso          DateTime?
+  fechaCorte               DateTime?
+  fechaCausacion           DateTime?
+  saldoCapital             Decimal? @db.Decimal(18, 2)
+  totalInteresesCorrientes Decimal? @db.Decimal(18, 2)
+  totalInteresesMora       Decimal? @db.Decimal(18, 2)
+  totalSeguroVida          Decimal? @db.Decimal(18, 2)
+  totalDeuda               Decimal? @db.Decimal(18, 2)
+  diasMora                 Int?
+  fechaUltimoPago          DateTime?
+  valorUltimoPago          Decimal? @db.Decimal(18, 2)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+  process                  Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
+  movimientos              Movimiento[]
+  cuotas                   CuotaAmortizacion[]
+
+  @@index([numeroCredito])
+}
+
+model Movimiento {
+  id          Int      @id @default(autoincrement())
+  processId   Int
+  creditoId   Int
+  orden       Int      @default(0)
+  documento   String?
+  fecha       DateTime?
+  descripcion String?
+  total       Decimal? @db.Decimal(18, 2)
+  capital     Decimal? @db.Decimal(18, 2)
+  interes     Decimal? @db.Decimal(18, 2)
+  mora        Decimal? @db.Decimal(18, 2)
+  seguroVida  Decimal? @db.Decimal(18, 2)
+  otros       Decimal? @db.Decimal(18, 2)
+  createdAt   DateTime @default(now())
+  credito     Credito  @relation(fields: [creditoId], references: [id], onDelete: Cascade)
+  process     Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
+
+  @@index([processId])
+  @@index([creditoId, fecha])
+}
+
+model CuotaAmortizacion {
+  id           Int      @id @default(autoincrement())
+  processId    Int
+  creditoId    Int
+  numero       Int?
+  fecha        DateTime?
+  cuota        Decimal? @db.Decimal(18, 2)
+  abonoCapital Decimal? @db.Decimal(18, 2)
+  abonoInteres Decimal? @db.Decimal(18, 2)
+  saldo        Decimal? @db.Decimal(18, 2)
+  createdAt    DateTime @default(now())
+  credito      Credito  @relation(fields: [creditoId], references: [id], onDelete: Cascade)
+  process      Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
+
+  @@index([processId])
+  @@index([creditoId, numero])
+}
+
+model ExtraccionCampo {
+  id          Int      @id @default(autoincrement())
+  processId   Int
+  analysisId  Int?
+  fileId      Int?
+  ruta        String
+  clave       String
+  valorTexto  String?  @db.Text
+  valorNumero Decimal? @db.Decimal(18, 4)
+  valorFecha  DateTime?
+  valorBool   Boolean?
+  valorJson   Json?
+  createdAt   DateTime @default(now())
+  process     Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
+
+  @@index([processId, ruta])
+  @@index([analysisId])
 }

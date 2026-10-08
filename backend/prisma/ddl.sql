@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS `File` (
   originalName VARCHAR(255) NOT NULL,
   storageKey VARCHAR(300) NOT NULL,
   mimeType VARCHAR(120) NOT NULL,
+  originalMimeType VARCHAR(120) NULL,
+  converted TINYINT(1) NOT NULL DEFAULT 0,
   sizeBytes INT NOT NULL,
   sha256 CHAR(64) NOT NULL,
   tipo VARCHAR(40) NULL,
@@ -52,10 +54,15 @@ CREATE TABLE IF NOT EXISTS `File` (
   CONSTRAINT file_uploaded_by_fkey FOREIGN KEY (uploadedBy) REFERENCES `User` (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Migraciones idempotentes para bases ya creadas (MariaDB admite IF NOT EXISTS en ADD COLUMN).
+ALTER TABLE `File` ADD COLUMN IF NOT EXISTS originalMimeType VARCHAR(120) NULL;
+ALTER TABLE `File` ADD COLUMN IF NOT EXISTS converted TINYINT(1) NOT NULL DEFAULT 0;
+
 CREATE TABLE IF NOT EXISTS `Analysis` (
   id INT NOT NULL AUTO_INCREMENT,
   processId INT NOT NULL,
   fileId INT NULL,
+  scope VARCHAR(20) NOT NULL DEFAULT 'file',
   status VARCHAR(40) NOT NULL DEFAULT 'pending',
   provider VARCHAR(500) NULL,
   model VARCHAR(120) NULL,
@@ -84,4 +91,117 @@ CREATE TABLE IF NOT EXISTS `AuditEvent` (
   createdAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id), KEY audit_resource_resource_id_idx (resource, resourceId), KEY audit_user_id_created_at_idx (userId, createdAt),
   CONSTRAINT audit_user_id_fkey FOREIGN KEY (userId) REFERENCES `User` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Migraciones idempotentes de columnas añadidas después de la creación inicial.
+ALTER TABLE `Analysis` ADD COLUMN IF NOT EXISTS scope VARCHAR(20) NOT NULL DEFAULT 'file';
+
+-- ---------- Fase 3: persistencia estructurada ----------
+CREATE TABLE IF NOT EXISTS `Parte` (
+  id INT NOT NULL AUTO_INCREMENT,
+  processId INT NOT NULL,
+  rol VARCHAR(40) NOT NULL,
+  orden INT NOT NULL DEFAULT 0,
+  tipoDocumento VARCHAR(40) NULL,
+  numeroDocumento VARCHAR(60) NULL,
+  nombreCompleto VARCHAR(200) NULL,
+  fechaExpedicion DATETIME(3) NULL,
+  lugarExpedicion VARCHAR(120) NULL,
+  fechaNacimiento DATETIME(3) NULL,
+  direccion VARCHAR(255) NULL,
+  ciudad VARCHAR(120) NULL,
+  departamento VARCHAR(120) NULL,
+  telefono VARCHAR(60) NULL,
+  celular VARCHAR(60) NULL,
+  email VARCHAR(160) NULL,
+  ocupacion VARCHAR(120) NULL,
+  empresa VARCHAR(160) NULL,
+  ingresosMensuales DECIMAL(18,2) NULL,
+  relacionDeudor VARCHAR(120) NULL,
+  createdAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updatedAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id), KEY parte_process_id_rol_idx (processId, rol), KEY parte_numero_documento_idx (numeroDocumento),
+  CONSTRAINT parte_process_id_fkey FOREIGN KEY (processId) REFERENCES `Process` (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `Credito` (
+  id INT NOT NULL AUTO_INCREMENT,
+  processId INT NOT NULL,
+  entidadId INT NULL,
+  numeroCredito VARCHAR(80) NULL,
+  numeroPagare VARCHAR(80) NULL,
+  producto VARCHAR(120) NULL,
+  monto DECIMAL(18,2) NULL,
+  plazoMeses INT NULL,
+  tasaEa DECIMAL(9,4) NULL,
+  tasaInteresCorriente DECIMAL(9,4) NULL,
+  tasaInteresMora DECIMAL(9,4) NULL,
+  fechaDesembolso DATETIME(3) NULL,
+  fechaCorte DATETIME(3) NULL,
+  fechaCausacion DATETIME(3) NULL,
+  saldoCapital DECIMAL(18,2) NULL,
+  totalInteresesCorrientes DECIMAL(18,2) NULL,
+  totalInteresesMora DECIMAL(18,2) NULL,
+  totalSeguroVida DECIMAL(18,2) NULL,
+  totalDeuda DECIMAL(18,2) NULL,
+  diasMora INT NULL,
+  fechaUltimoPago DATETIME(3) NULL,
+  valorUltimoPago DECIMAL(18,2) NULL,
+  createdAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updatedAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id), UNIQUE KEY credito_process_id_key (processId), KEY credito_numero_credito_idx (numeroCredito),
+  CONSTRAINT credito_process_id_fkey FOREIGN KEY (processId) REFERENCES `Process` (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `Movimiento` (
+  id INT NOT NULL AUTO_INCREMENT,
+  processId INT NOT NULL,
+  creditoId INT NOT NULL,
+  orden INT NOT NULL DEFAULT 0,
+  documento VARCHAR(80) NULL,
+  fecha DATETIME(3) NULL,
+  descripcion VARCHAR(255) NULL,
+  total DECIMAL(18,2) NULL,
+  capital DECIMAL(18,2) NULL,
+  interes DECIMAL(18,2) NULL,
+  mora DECIMAL(18,2) NULL,
+  seguroVida DECIMAL(18,2) NULL,
+  otros DECIMAL(18,2) NULL,
+  createdAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id), KEY movimiento_process_id_idx (processId), KEY movimiento_credito_id_fecha_idx (creditoId, fecha),
+  CONSTRAINT movimiento_process_id_fkey FOREIGN KEY (processId) REFERENCES `Process` (id) ON DELETE CASCADE,
+  CONSTRAINT movimiento_credito_id_fkey FOREIGN KEY (creditoId) REFERENCES `Credito` (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `CuotaAmortizacion` (
+  id INT NOT NULL AUTO_INCREMENT,
+  processId INT NOT NULL,
+  creditoId INT NOT NULL,
+  numero INT NULL,
+  fecha DATETIME(3) NULL,
+  cuota DECIMAL(18,2) NULL,
+  abonoCapital DECIMAL(18,2) NULL,
+  abonoInteres DECIMAL(18,2) NULL,
+  saldo DECIMAL(18,2) NULL,
+  createdAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id), KEY cuota_amortizacion_process_id_idx (processId), KEY cuota_amortizacion_credito_id_numero_idx (creditoId, numero),
+  CONSTRAINT cuota_process_id_fkey FOREIGN KEY (processId) REFERENCES `Process` (id) ON DELETE CASCADE,
+  CONSTRAINT cuota_credito_id_fkey FOREIGN KEY (creditoId) REFERENCES `Credito` (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `ExtraccionCampo` (
+  id INT NOT NULL AUTO_INCREMENT,
+  processId INT NOT NULL,
+  analysisId INT NULL,
+  fileId INT NULL,
+  ruta VARCHAR(255) NOT NULL,
+  clave VARCHAR(120) NOT NULL,
+  valorTexto TEXT NULL,
+  valorNumero DECIMAL(18,4) NULL,
+  valorFecha DATETIME(3) NULL,
+  valorBool TINYINT(1) NULL,
+  valorJson JSON NULL,
+  createdAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id), KEY extraccion_campo_process_id_ruta_idx (processId, ruta), KEY extraccion_campo_analysis_id_idx (analysisId),
+  CONSTRAINT extraccion_campo_process_id_fkey FOREIGN KEY (processId) REFERENCES `Process` (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -1,151 +1,59 @@
 import { useEffect, useState } from 'react';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { api } from './api';
 import { Login } from './components/Login';
-import { ProcessDetail } from './components/ProcessDetail';
-import { ProcessList } from './components/ProcessList';
 import { Toasts } from './components/Toasts';
-import { UsersPanel } from './components/UsersPanel';
-import type { Detail, Entidad, NewUserPayload, Process, Toast, User } from './types';
+import { AppContext } from './context';
+import { AppShell } from './layout/AppShell';
+import { Home } from './pages/Home';
+import { ProcessDetailPage } from './pages/ProcessDetailPage';
+import { ProcessesPage } from './pages/ProcessesPage';
+import { UsersPage } from './pages/UsersPage';
+import type { Toast, ToastType, User } from './types';
 
 let nextToastId = 0;
 
 export function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
-  const [entidades, setEntidades] = useState<Entidad[]>([]);
-  const [processes, setProcesses] = useState<Process[]>([]);
-  const [selected, setSelected] = useState<Detail | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [busy, setBusy] = useState<Record<string, boolean>>({});
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | undefined>();
+  const [checking, setChecking] = useState(true);
 
-  const toast = (type: Toast['type'], message: string) => {
+  const toast = (type: ToastType, msg: string) => {
     const id = ++nextToastId;
-    setToasts(t => [...t, { id, type, message }]);
+    setToasts(t => [...t, { id, type, message: msg }]);
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 6000);
   };
 
-  const dismissToast = (id: number) => setToasts(t => t.filter(x => x.id !== id));
-
-  const run = async (key: string, fn: () => Promise<void>) => {
-    setBusy(b => ({ ...b, [key]: true }));
-    try {
-      await fn();
-    } catch (error) {
-      toast('error', error instanceof Error ? error.message : 'Ocurrió un error.');
-    } finally {
-      setBusy(b => ({ ...b, [key]: false }));
-    }
-  };
-
-  const refresh = async () => {
-    const currentUser = await api.me();
-    setUser(currentUser);
-    const page = await api.listProcesses();
-    setProcesses(page.items);
-    const entidades = await api.listEntidades();
-    setEntidades(entidades);
-    if (currentUser.role === 'admin') {
-      const userPage = await api.listUsers();
-      setUsers(userPage.items);
-    }
-  };
-
   useEffect(() => {
-    refresh().catch(() => { setUser(null); setSelected(null); });
+    api.me().then(setUser).catch(() => setUser(null)).finally(() => setChecking(false));
   }, []);
 
-  const login = (username: string, password: string) =>
-    run('login', async () => { const data = await api.login(username, password); setUser(data.user); await refresh(); toast('success', 'Bienvenido.'); });
+  const login = async (username: string, password: string) => {
+    setBusy(true); setMessage(undefined);
+    try { const data = await api.login(username, password); setUser(data.user); }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'No se pudo ingresar.'); }
+    finally { setBusy(false); }
+  };
 
-  const logout = () =>
-    run('logout', async () => { await api.logout(); setUser(null); setSelected(null); setProcesses([]); });
+  const logout = () => { void api.logout().catch(() => undefined); setUser(null); };
 
-  const openProcess = (id: number) => void run('open', async () => { setSelected(await api.getProcess(id)); });
-
-  const createProcess = (title: string, entidadId?: number) =>
-    run('createProcess', async () => { const p = await api.createProcess(title, entidadId); toast('success', 'Proceso creado.'); await refresh(); setSelected(await api.getProcess(p.id)); });
-
-  const createUser = (payload: NewUserPayload) =>
-    run('createUser', async () => { await api.createUser(payload); toast('success', 'Usuario creado.'); await refresh(); });
-
-  const upload = (form: FormData, tipo?: string) =>
-    run('upload', async () => {
-      if (!selected) return;
-      await api.uploadFile(selected.id, form, tipo);
-      toast('success', 'Archivo subido.');
-      setSelected(await api.getProcess(selected.id));
-      await refresh();
-    });
-
-  const analyze = (fileId?: number) =>
-    run('analyze', async () => {
-      if (!selected) return;
-      const analysis = await api.analyze(selected.id, fileId);
-      toast(analysis.status === 'completed' ? 'success' : 'error', analysis.status === 'completed' ? 'Análisis completado.' : `Análisis falló: ${analysis.error}`);
-      setSelected(await api.getProcess(selected.id));
-      await refresh();
-    });
-
-  const download = (fileId: number, name: string) =>
-    void run('download', async () => {
-      const response = await fetch(api.downloadUrl(fileId), { credentials: 'include' });
-      if (!response.ok) throw new Error('No se pudo descargar el archivo.');
-      const url = URL.createObjectURL(await response.blob());
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = name;
-      link.click();
-      URL.revokeObjectURL(url);
-    });
-
-  const validar = (analysisId: number, datos: unknown) =>
-    run('validar', async () => {
-      await api.validarAnalysis(analysisId, datos);
-      toast('success', 'Validación guardada.');
-      if (selected) setSelected(await api.getProcess(selected.id));
-    });
-
-  if (!user) return <Login onSubmit={login} busy={busy['login'] ?? false} />;
+  if (checking) return <main className="login"><p className="placeholder">Cargando…</p></main>;
+  if (!user) return <Login onSubmit={login} busy={busy} message={message} />;
 
   return (
-    <main>
-      <header>
-        <div className="brand">
-          <div className="brand-mark">N2</div>
-          <div>
-            <div className="brand-name">Node2</div>
-            <div className="hint">Procesos y análisis IA</div>
-          </div>
-        </div>
-        <div className="header-right">
-          <span className="user-chip"><span className="dot" />{user.name} · {user.role}</span>
-          <button className="btn-ghost" onClick={() => void logout()}>Salir</button>
-        </div>
-      </header>
-      <Toasts toasts={toasts} onDismiss={dismissToast} />
-      {user.role === 'admin' && (
-        <UsersPanel users={users} busy={busy['createUser'] ?? false} onSubmit={createUser} />
-      )}
-      {selected ? (
-        <section className="detail-view">
-          <div className="detail-toolbar">
-            <button type="button" className="btn-ghost" onClick={() => setSelected(null)}>← Volver a la lista</button>
-          </div>
-          <ProcessDetail
-            selected={selected}
-            busyUpload={busy['upload'] ?? false}
-            busyAnalyze={busy['analyze'] ?? false}
-            onUpload={upload}
-            onAnalyze={analyze}
-            onDownload={download}
-            onValidar={validar}
-          />
-        </section>
-      ) : (
-        <section className="list-view">
-          <ProcessList processes={processes} entidades={entidades} busy={busy['createProcess'] ?? false} onSelect={openProcess} onCreate={createProcess} />
-        </section>
-      )}
-    </main>
+    <AppContext.Provider value={{ user, toast, logout }}>
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route index element={<Home />} />
+          <Route path="procesos" element={<ProcessesPage />} />
+          <Route path="procesos/:id" element={<ProcessDetailPage />} />
+          {user.role === 'admin' && <Route path="usuarios" element={<UsersPage />} />}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+      <Toasts toasts={toasts} onDismiss={id => setToasts(t => t.filter(x => x.id !== id))} />
+    </AppContext.Provider>
   );
 }

@@ -14,7 +14,7 @@ await prisma.user.upsert({
 });
 
 const entidades = [
-  { codigo: 'condiar', nombre: 'CONDIAR' },
+  { codigo: 'confiar', nombre: 'CONFIAR' },
   { codigo: 'crearcoop', nombre: 'Cooperativa CREAR LTDA' },
   { codigo: 'somec', nombre: 'SOCIAL Y DE MERCADEO CENTRAL LTDA (SOMEC)' },
 ];

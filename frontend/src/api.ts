@@ -1,4 +1,4 @@
-import type { Analysis, Detail, Entidad, FileItem, NewUserPayload, Process, User } from './types';
+import type { Analysis, Detail, Entidad, FileItem, Liquidacion, NewUserPayload, Process, Structured, User } from './types';
 
 const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api';
 
@@ -25,6 +25,9 @@ export const api = {
 
   listProcesses: () => request<{ items: Process[] }>('/processes'),
   getProcess: (id: number) => request<Detail>(`/processes/${id}`),
+  getStructured: (id: number) => request<Structured>(`/processes/${id}/structured`),
+  liquidar: (id: number, payload: { cuotaInicial: number; cuotaCorte: number; interesesMora?: number; overridesCapital?: Record<string, number> }) =>
+    request<Liquidacion>(`/processes/${id}/liquidacion`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
   createProcess: (title: string, entidadId?: number) =>
     request<Process>('/processes', {
       method: 'POST',
@@ -58,6 +61,20 @@ export const api = {
       body: JSON.stringify({ fileId }),
     }),
 
+  analyzeAll: (processId: number) =>
+    request<{ queued: number; skipped: number; total: number }>(`/processes/${processId}/analyze-all`, { method: 'POST' }),
+
+  consolidate: (processId: number) =>
+    request<Analysis>(`/processes/${processId}/consolidate`, { method: 'POST' }),
+
+  deleteFile: (fileId: number) => request<{ ok: boolean }>(`/files/${fileId}`, { method: 'DELETE' }),
+
+  replaceFile: (processId: number, fileId: number, form: FormData, tipo?: string) =>
+    request<FileItem>(`/processes/${processId}/files/${fileId}${tipo ? `?tipo=${encodeURIComponent(tipo)}` : ''}`, { method: 'PUT', body: form }),
+
+  updateUser: (id: number, payload: Partial<{ name: string; role: 'admin' | 'operator'; active: boolean; password: string }>) =>
+    request<User>(`/users/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
+
   validarAnalysis: (analysisId: number, datos: unknown) =>
     request<{ ok: boolean }>(`/analyses/${analysisId}/validar`, {
       method: 'POST',
@@ -66,4 +83,5 @@ export const api = {
     }),
 
   downloadUrl: (fileId: number) => `${apiUrl}/files/${fileId}/download`,
+  viewUrl: (fileId: number) => `${apiUrl}/files/${fileId}/view`,
 };

@@ -124,9 +124,30 @@ npm run typecheck
 npm run build
 ```
 
-Cuando se agregue el runner de pruebas, el flujo obligatorio será `npm run typecheck`, `npm run test` y `npm run build`. Las pruebas no deben usar R2 real ni un token IA real: deben apuntar a MariaDB de pruebas, un bucket aislado o adaptador falso y un proveedor IA simulado.
+El flujo obligatorio es `npm run typecheck`, `npm run test` y `npm run build`. Las pruebas no deben usar un token IA real: usan proveedor simulado y datos sintéticos.
 
-## 9. Respaldos y recuperación
+## 9. Estructura de datos
+
+Además del JSON de cada análisis, la aplicación normaliza la información del proceso en tablas consultables:
+
+- `Parte` (deudor, codeudor, referencias, apoderado, otorgante).
+- `Credito` (una por proceso: números, montos, tasas, fechas y saldos).
+- `Movimiento` (filas del estado de cuenta).
+- `CuotaAmortizacion` (plan de pagos).
+- `ExtraccionCampo` (todo campo extraído, por `ruta`).
+
+Se generan al **consolidar** el análisis del proceso (`backend/src/normalize.ts`) y se reescriben en cada consolidación.
+
+## 10. Parámetros de liquidación
+
+```dotenv
+SMLMV=1750905
+UMBRAL_MINIMA_SMLMV=40
+```
+
+Usados por `backend/src/demanda/liquidacion.ts` para calcular la cuantía y la competencia (mínima/menor). Ajusta `SMLMV` al valor vigente del año.
+
+## 11. Respaldos y recuperación
 
 - Base: `mariadb-dump --single-transaction node2 > node2.sql`.
 - Archivos: respaldar el volumen `node2_files_data` o el directorio del bind mount.

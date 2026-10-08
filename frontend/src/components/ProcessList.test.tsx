@@ -5,12 +5,12 @@ import { ProcessList } from './ProcessList';
 import type { Entidad, Process } from '../types';
 
 const processes: Process[] = [
-  { id: 1, code: 'PR-2026-AAA', title: 'Proceso A', status: 'created', createdAt: '', entidad: { codigo: 'condiar', nombre: 'CONDIAR' } },
+  { id: 1, code: 'PR-2026-AAA', title: 'Proceso A', status: 'created', createdAt: '', entidad: { codigo: 'confiar', nombre: 'CONFIAR' } },
   { id: 2, code: 'PR-2026-BBB', title: 'Proceso B', status: 'analyzed', createdAt: '', _count: { files: 3, analyses: 1 } },
 ];
 
 const entidades: Entidad[] = [
-  { id: 1, codigo: 'condiar', nombre: 'CONDIAR' },
+  { id: 1, codigo: 'confiar', nombre: 'CONFIAR' },
   { id: 2, codigo: 'somec', nombre: 'SOMEC' },
 ];
 
@@ -20,7 +20,7 @@ describe('ProcessList', () => {
     expect(screen.getByText('Proceso A')).toBeInTheDocument();
     expect(screen.getByText('Proceso B')).toBeInTheDocument();
     expect(screen.getAllByText('created').length).toBe(1);
-    expect(screen.getAllByText(/CONDIAR/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/CONFIAR/).length).toBeGreaterThan(0);
   });
 
   it('abre un proceso al seleccionarlo', async () => {

@@ -26,6 +26,7 @@ Devuelve únicamente las claves que apliquen al documento y respeta los tipos su
 {
   "tipo_documento": "string — e.g. estado_cuenta, amortizacion, pagare, vinculacion, poder, u otro",
   "estado_cuenta": { "numero_credito": null, "asociado": null, "fecha_desde": null, "fecha_corte": null,
+    "fecha_causacion": null,
     "capital_desembolsado": null, "saldo_capital": null, "total_intereses_corrientes": null,
     "total_intereses_mora": null, "total_seguro_vida": null, "total_deuda": null,
     "tasa_interes_corriente": null, "tasa_interes_mora": null, "dias_mora": null,
@@ -49,4 +50,6 @@ Devuelve únicamente las claves que apliquen al documento y respeta los tipos su
 
 Reglas:
 - Incluye TODAS las filas de "movimientos" y "cuotas" presentes (hasta 200); NO las resumas ni repitas.
-- No inventes campos que no estén en el documento; deja los que no apliquen como null u omítelos.`;
+- No inventes campos que no estén en el documento; deja los que no apliquen como null u omítelos.
+- Fecha de causación: último "abono a capital" o "pago de interés"; usa la fecha del movimiento inmediatamente posterior (mora o interés corriente).
+- Tasa efectiva anual ("TEA", "T.E.A"): extrae el valor numérico redondeado a 2 decimales; no la conviertas ni mensualices.`;
