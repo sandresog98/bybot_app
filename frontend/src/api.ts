@@ -42,10 +42,16 @@ export const api = {
       body: JSON.stringify({ title, entidadId }),
     }),
 
-  listEntidades: () => request<Entidad[]>('/entidades'),
+  listEntidades: (options: { all?: boolean } = {}) => request<Entidad[]>(`/entidades${options.all ? '?all=1' : ''}`),
   createEntidad: (payload: { codigo: string; nombre: string; nit?: string }) =>
     request<Entidad>('/entidades', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }),
+  updateEntidad: (id: number, payload: Partial<{ codigo: string; nombre: string; nit: string | null; active: boolean }>) =>
+    request<Entidad>(`/entidades/${id}`, {
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }),

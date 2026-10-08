@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ProcessDetail } from './ProcessDetail';
@@ -84,7 +84,7 @@ describe('ProcessDetail', () => {
     expect(screen.getByRole('button', { name: 'Editar' })).toBeInTheDocument();
   });
 
-  it('ofrece analizar todos los archivos y eliminar con confirmación', async () => {
+  it('ofrece analizar todos los archivos y eliminar con doble confirmación', async () => {
     const onAnalyzeAll = vi.fn().mockResolvedValue(undefined);
     const onDelete = vi.fn().mockResolvedValue(undefined);
     render(<ProcessDetail {...baseProps} onAnalyzeAll={onAnalyzeAll} onDelete={onDelete} />);
@@ -92,6 +92,8 @@ describe('ProcessDetail', () => {
     expect(onAnalyzeAll).toHaveBeenCalledTimes(1);
     await userEvent.click(screen.getByTitle('Eliminar'));
     await userEvent.click(screen.getByTitle('Confirmar eliminación'));
+    const dialog = screen.getByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Eliminar definitivamente' }));
     expect(onDelete).toHaveBeenCalledWith(7);
   });
 

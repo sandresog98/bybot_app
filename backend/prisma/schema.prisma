@@ -26,6 +26,7 @@ model Entidad {
   codigo   String    @unique
   nombre   String
   nit      String?
+  active   Boolean   @default(true)
   processes Process[]
   createdAt DateTime @default(now())
 }

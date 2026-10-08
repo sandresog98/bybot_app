@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS `Entidad` (
   codigo VARCHAR(60) NOT NULL,
   nombre VARCHAR(160) NOT NULL,
   nit VARCHAR(40) NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
   createdAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id), UNIQUE KEY entidad_codigo_key (codigo)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -100,6 +101,7 @@ ALTER TABLE `Analysis` ADD COLUMN IF NOT EXISTS scope VARCHAR(20) NOT NULL DEFAU
 ALTER TABLE `Process` ADD COLUMN IF NOT EXISTS deudorNombre VARCHAR(200) NULL;
 ALTER TABLE `Process` ADD COLUMN IF NOT EXISTS deudorDocumento VARCHAR(60) NULL;
 ALTER TABLE `Process` ADD INDEX IF NOT EXISTS process_deudor_documento_idx (deudorDocumento);
+ALTER TABLE `Entidad` ADD COLUMN IF NOT EXISTS active TINYINT(1) NOT NULL DEFAULT 1;
 
 -- ---------- Fase 3: persistencia estructurada ----------
 CREATE TABLE IF NOT EXISTS `Parte` (

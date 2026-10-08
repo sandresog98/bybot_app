@@ -6,6 +6,7 @@ import { Toasts } from './components/Toasts';
 import { AppContext } from './context';
 import { AppShell } from './layout/AppShell';
 import { Home } from './pages/Home';
+import { ClientsPage } from './pages/ClientsPage';
 import { ProcessDetailPage } from './pages/ProcessDetailPage';
 import { ProcessesPage } from './pages/ProcessesPage';
 import { UsersPage } from './pages/UsersPage';
@@ -49,6 +50,7 @@ export function App() {
           <Route index element={<Home />} />
           <Route path="procesos" element={<ProcessesPage />} />
           <Route path="procesos/:id" element={<ProcessDetailPage />} />
+          {user.role === 'admin' && <Route path="clientes" element={<ClientsPage />} />}
           {user.role === 'admin' && <Route path="usuarios" element={<UsersPage />} />}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

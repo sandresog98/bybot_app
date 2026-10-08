@@ -17,7 +17,7 @@ export function ProcessesPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api.listEntidades().then(setEntidades).catch(() => undefined);
+    api.listEntidades({ all: true }).then(setEntidades).catch(() => undefined);
   }, []);
 
   useEffect(() => {

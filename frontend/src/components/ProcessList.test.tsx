@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ProcessList } from './ProcessList';
@@ -10,16 +10,17 @@ const processes: Process[] = [
 ];
 
 const entidades: Entidad[] = [
-  { id: 1, codigo: 'confiar', nombre: 'CONFIAR' },
-  { id: 2, codigo: 'somec', nombre: 'SOMEC' },
+  { id: 1, codigo: 'confiar', nombre: 'CONFIAR', active: true },
+  { id: 2, codigo: 'somec', nombre: 'SOMEC', active: true },
 ];
 
 describe('ProcessList', () => {
-  it('muestra los procesos, su estado, cliente y deudor', () => {
+  it('muestra los procesos, su estado amigable, cliente y deudor', () => {
     render(<ProcessList processes={processes} entidades={entidades} busy={false} onSelect={vi.fn()} onCreate={vi.fn()} />);
     expect(screen.getByText('Proceso A')).toBeInTheDocument();
     expect(screen.getByText('Proceso B')).toBeInTheDocument();
-    expect(screen.getAllByText('created').length).toBe(1);
+    expect(screen.getByText('Creado')).toBeInTheDocument();
+    expect(screen.getByText('Analizado')).toBeInTheDocument();
     expect(screen.getAllByText(/CONFIAR/).length).toBeGreaterThan(0);
     expect(screen.getByText(/ANA PEREZ/)).toBeInTheDocument();
     expect(screen.getByText(/1019044893/)).toBeInTheDocument();
@@ -33,12 +34,14 @@ describe('ProcessList', () => {
     expect(onSelect).toHaveBeenCalledWith(1);
   });
 
-  it('crea un proceso con entidad opcional y resetea', async () => {
+  it('crea un proceso desde el modal', async () => {
     const onCreate = vi.fn().mockResolvedValue(undefined);
-    const { container } = render(<ProcessList processes={processes} entidades={entidades} busy={false} onSelect={vi.fn()} onCreate={onCreate} />);
-    await userEvent.type(screen.getByPlaceholderText('Nombre del proceso'), 'Nuevo');
-    await userEvent.selectOptions(screen.getByRole('combobox'), '2');
-    fireEvent.submit(container.querySelector('form.create-form')!);
+    render(<ProcessList processes={processes} entidades={entidades} busy={false} onSelect={vi.fn()} onCreate={onCreate} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Nuevo proceso' }));
+    const dialog = screen.getByRole('dialog');
+    await userEvent.type(within(dialog).getByPlaceholderText('Nombre del proceso'), 'Nuevo');
+    await userEvent.selectOptions(within(dialog).getByRole('combobox'), '2');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Crear proceso' }));
     expect(onCreate).toHaveBeenCalledWith('Nuevo', 2);
   });
 

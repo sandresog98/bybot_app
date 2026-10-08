@@ -11,6 +11,7 @@ export type Entidad = {
   codigo: string;
   nombre: string;
   nit?: string | null;
+  active?: boolean;
 };
 
 export const FILE_TIPOS = ['estado_cuenta', 'amortizacion', 'pagare', 'vinculacion', 'poder', 'anexo', 'otro'] as const;

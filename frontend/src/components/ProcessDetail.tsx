@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { Check, ChevronsDownUp, ChevronsUpDown, Eye, RefreshCw, Sparkles, Trash2, Upload, UploadCloud, X } from 'lucide-react';
+import { Check, ChevronsDownUp, ChevronsUpDown, Eye, RefreshCw, Sparkles, Trash2, Upload, UploadCloud, AlertTriangle, X } from 'lucide-react';
 import { FILE_TIPO_LABELS } from '../types';
 import type { Detail, FileItem, Structured } from '../types';
+import { statusLabel } from '../status';
 import { Collapsible } from './Collapsible';
+import { Modal } from './Modal';
 import { ResultadoIA } from './ResultadoIA';
 import { StructuredData } from './StructuredData';
 
@@ -44,6 +46,7 @@ const fmtUsd = (v: string | number | null | undefined) => (v == null ? null : `U
 
 export function ProcessDetail({ selected, structured, busyUpload, busyAnalyze, busyAnalyzeAll, busyConsolidate, onUpload, onAnalyze, onAnalyzeAll, onConsolidate, onDelete, onReplace, onView, onDownload, onValidar }: Props) {
   const [confirmId, setConfirmId] = useState<number | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<FileItem | null>(null);
   const [selectedRun, setSelectedRun] = useState<Record<string, number>>({});
   const [uploadName, setUploadName] = useState('');
   const [openResults, setOpenResults] = useState<Record<string, boolean>>({});
@@ -86,7 +89,7 @@ export function ProcessDetail({ selected, structured, busyUpload, busyAnalyze, b
     <article>
       <h2>{selected.title}</h2>
       <p className="hint">
-        {selected.code} · <span className="status" data-status={selected.status}>{selected.status}</span>
+        {selected.code} · <span className="status" data-status={selected.status}>{statusLabel(selected.status)}</span>
         {selected.entidad && <> · Cliente: <strong>{selected.entidad.nombre}</strong></>}
         {selected.deudorNombre && <> · Deudor: <strong>{selected.deudorNombre}</strong>{selected.deudorDocumento ? ` (${selected.deudorDocumento})` : ''}</>}
       </p>
@@ -145,7 +148,7 @@ export function ProcessDetail({ selected, structured, busyUpload, busyAnalyze, b
                     {extOfMime(file.originalMimeType)} → {extOfMime(file.mimeType)}
                   </span>
                 )}
-                {analysis && <span className="status" data-status={analysis.status}>{analysis.status}</span>}
+                {analysis && <span className="status" data-status={analysis.status}>{statusLabel(analysis.status)}</span>}
               </span>
               <span className="file-actions">
                 <button type="button" className="icon-btn" title="Ver" onClick={() => onView(file.id, file.originalName)}>
@@ -160,7 +163,7 @@ export function ProcessDetail({ selected, structured, busyUpload, busyAnalyze, b
                 </label>
                 {confirmId === file.id ? (
                   <span className="confirm-group">
-                    <button type="button" className="icon-btn danger" title="Confirmar eliminación" onClick={() => { setConfirmId(null); void onDelete(file.id); }}>
+                    <button type="button" className="icon-btn danger" title="Confirmar eliminación" onClick={() => { setConfirmId(null); setPendingDelete(file); }}>
                       <Check size={16} aria-hidden />
                     </button>
                     <button type="button" className="icon-btn" title="Cancelar" onClick={() => setConfirmId(null)}>
@@ -207,7 +210,7 @@ export function ProcessDetail({ selected, structured, busyUpload, busyAnalyze, b
               title={title}
               subtitle={(
                 <>
-                  <span className="status" data-status={chosen.status}>{chosen.status}</span>
+                  <span className="status" data-status={chosen.status}>{statusLabel(chosen.status)}</span>
                   {chosen.model && <span className="consumo-chip">{chosen.model}</span>}
                   {(chosen.inputTokens != null || chosen.outputTokens != null) && (
                     <span className="consumo-chip">tok {chosen.inputTokens ?? 0} / {chosen.outputTokens ?? 0}</span>
@@ -219,14 +222,14 @@ export function ProcessDetail({ selected, structured, busyUpload, busyAnalyze, b
             >
               {chosen.status === 'completed'
                 ? <ResultadoIA data={chosen.validated ?? chosen.result ?? {}} onSave={datos => onValidar(chosen.id, datos)} />
-                : <p className="notice">{chosen.error ?? `Estado: ${chosen.status}`}</p>}
+                : <p className="notice">{chosen.error ?? `Estado: ${statusLabel(chosen.status)}`}</p>}
               {runs.length > 1 && (
                 <details className="history">
                   <summary>Historial de ejecuciones ({runs.length})</summary>
                   <ul className="history-list">
                     {runs.map(run => (
                       <li key={run.id} className={`history-item${run.id === chosen.id ? ' active' : ''}`}>
-                        <span className="status" data-status={run.status}>{run.status}</span>
+                        <span className="status" data-status={run.status}>{statusLabel(run.status)}</span>
                         <span className="history-meta">
                           #{run.id}{run.model ? ` · ${run.model}` : ''} · tok {run.inputTokens ?? 0}/{run.outputTokens ?? 0}
                           {run.error ? ` · ${run.error}` : ''}
@@ -253,6 +256,28 @@ export function ProcessDetail({ selected, structured, busyUpload, busyAnalyze, b
       >
         <StructuredData data={structured} />
       </Collapsible>
+
+      {pendingDelete && (
+        <Modal title="Eliminar archivo" onClose={() => setPendingDelete(null)}>
+          <div className="warning-box">
+            <AlertTriangle size={30} aria-hidden />
+            <p>
+              ¿Seguro que deseas eliminar <strong>{pendingDelete.originalName}</strong>?
+              Esta acción no se puede deshacer.
+            </p>
+          </div>
+          <div className="modal-actions">
+            <button type="button" className="btn-ghost" onClick={() => setPendingDelete(null)}>Cancelar</button>
+            <button
+              type="button"
+              className="btn-danger"
+              onClick={() => { const target = pendingDelete; setPendingDelete(null); void onDelete(target.id); }}
+            >
+              Eliminar definitivamente
+            </button>
+          </div>
+        </Modal>
+      )}
     </article>
   );
 }

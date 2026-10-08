@@ -118,14 +118,40 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   app.get('/api/entidades', async (request) => {
-    await requireUser(request);
-    return prisma.entidad.findMany({ orderBy: { nombre: 'asc' }, select: { id: true, codigo: true, nombre: true, nit: true } });
+    const user = await requireUser(request);
+    const { all } = z.object({ all: z.string().optional() }).parse(request.query);
+    const includeInactive = all === '1' || all === 'true';
+    const where = user.role === 'admin' && includeInactive ? {} : { active: true };
+    return prisma.entidad.findMany({ where, orderBy: { nombre: 'asc' }, select: { id: true, codigo: true, nombre: true, nit: true, active: true } });
   });
   app.post('/api/entidades', async (request) => {
     const admin = await requireAdmin(request);
     const body = z.object({ codigo: z.string().trim().min(2).max(60).regex(/^[a-zA-Z0-9_.-]+$/), nombre: z.string().trim().min(2).max(160), nit: z.string().trim().max(40).optional() }).parse(request.body);
     const exists = await prisma.entidad.findUnique({ where: { codigo: body.codigo } }); if (exists) throw fail(409, 'La entidad ya existe.');
     const entidad = await prisma.entidad.create({ data: body }); await audit(admin.id, 'create', 'entidad', entidad.id, entidad.codigo); return entidad;
+  });
+  app.patch('/api/entidades/:id', async (request) => {
+    const admin = await requireAdmin(request);
+    const id = z.coerce.number().int().positive().parse((request.params as { id: string }).id);
+    const body = z.object({
+      nombre: z.string().trim().min(2).max(160).optional(),
+      nit: z.string().trim().max(40).nullable().optional(),
+      codigo: z.string().trim().min(2).max(60).regex(/^[a-zA-Z0-9_.-]+$/).optional(),
+      active: z.boolean().optional(),
+    }).parse(request.body);
+    const target = await prisma.entidad.findUnique({ where: { id } }); if (!target) throw fail(404, 'Cliente no encontrado.');
+    if (body.codigo && body.codigo !== target.codigo) {
+      const duplicate = await prisma.entidad.findUnique({ where: { codigo: body.codigo } });
+      if (duplicate) throw fail(409, 'El código de cliente ya existe.');
+    }
+    const data: Prisma.EntidadUpdateInput = {};
+    if (body.nombre !== undefined) data.nombre = body.nombre;
+    if (body.nit !== undefined) data.nit = body.nit;
+    if (body.codigo !== undefined) data.codigo = body.codigo;
+    if (body.active !== undefined) data.active = body.active;
+    const entidad = await prisma.entidad.update({ where: { id }, data });
+    await audit(admin.id, 'update', 'entidad', entidad.id, entidad.codigo);
+    return entidad;
   });
 
   app.get('/api/processes', async (request) => {
@@ -147,7 +173,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
   app.post('/api/processes', async (request) => {
     const user = await requireUser(request); const body = z.object({ title: z.string().trim().min(3).max(120), entidadId: z.number().int().positive().optional() }).parse(request.body);
-    if (body.entidadId) { const ent = await prisma.entidad.findUnique({ where: { id: body.entidadId } }); if (!ent) throw fail(400, 'Entidad no válida.'); }
+    if (body.entidadId) { const ent = await prisma.entidad.findUnique({ where: { id: body.entidadId } }); if (!ent) throw fail(400, 'Cliente no válido.'); if (!ent.active) throw fail(400, 'El cliente está inactivo; no se pueden crear procesos con él.'); }
     const process = await prisma.process.create({ data: { code: processCode(), title: body.title, createdBy: user.id, entidadId: body.entidadId ?? null } }); await audit(user.id, 'create', 'process', process.id, process.code); return process;
   });
   app.get('/api/processes/:id', async (request) => {
