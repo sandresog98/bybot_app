@@ -5,7 +5,7 @@ Aplicación **ByBot**, de **ByB Jurídicos**, para **gestión de usuarios, proce
 ## Arquitectura
 
 - `backend/`: API Fastify, sesión en cookie HttpOnly, Prisma, worker IA y servicio local de archivos.
-- `frontend/`: interfaz React/Vite para operar los cuatro módulos.
+- `frontend/`: interfaz React/Vite para operar los módulos (Inicio, Procesos, Clientes, Usuarios).
 - MariaDB es la base de datos objetivo; los archivos se almacenan en un volumen persistente del backend.
 
 ## Requisitos
@@ -18,7 +18,7 @@ La guía completa, reproducible para desarrollo y servidor, está en [DEPLOYMENT
 ## Inicio local
 
 ```bash
-cd node2
+cd bybot_app
 cp .env.example .env
 # Cambia JWT_SECRET y ADMIN_PASSWORD antes de continuar.
 npm install
@@ -53,6 +53,10 @@ Con `AI_PROVIDER="gemini"` (recomendado) el análisis es multimodal: se envían 
 
 En la interfaz, el detalle del proceso ofrece: subir/reemplazar/eliminar/ver archivos, **Analizar todos los archivos IA**, **Consolidar análisis del proceso**, **Datos estructurados** y **Liquidación (borrador)**. Cada archivo conserva su **historial de ejecuciones** y se muestra por defecto la última ejecución exitosa.
 
+La navegación tiene **Inicio, Procesos, Clientes (admin) y Usuarios (admin)**. El listado de procesos es una **tabla** (con búsqueda y filtros por cliente y estado) que muestra el **deudor y su cédula**; en móvil se convierte en tarjetas. Hay **tema claro/oscuro** (botón en el sidebar) y diseño responsive.
+
+La marca es **ByBot**, de **ByB Jurídicos**. Los logos viven en `frontend/public/` (`bybot-logo-light.png`, `bybot-logo-dark.png`, `byb-logo.png`) y se seleccionan según el tema.
+
 ## Parámetros de liquidación
 
 ```dotenv
@@ -65,11 +69,12 @@ UMBRAL_MINIMA_SMLMV=40
 ## Operación
 
 1. Inicia sesión con el usuario creado por `npm run db:seed`.
-2. Crea un proceso (con cliente/entidad) y carga sus documentos.
-3. Pulsa **Analizar todos los archivos IA** (encola solo pendientes y fallidos).
-4. Pulsa **Consolidar análisis del proceso** para unificar y llenar los datos estructurados.
-5. Revisa/corrige los datos en el resultado y guarda la validación.
-6. Usa **Liquidación (borrador)** indicando la cuota inicial en mora y la cuota de corte.
+2. Un administrador gestiona los **Clientes** (crear/editar y activar/desactivar) en la sección **Clientes**; al crear procesos solo aparecen los activos.
+3. Crea un proceso (con cliente/entidad) y carga sus documentos.
+4. Pulsa **Analizar todos los archivos IA** (encola solo pendientes y fallidos).
+5. Pulsa **Consolidar análisis del proceso** para unificar y llenar los datos estructurados.
+6. Revisa/corrige los datos en el resultado y guarda la validación.
+7. Usa **Liquidación (borrador)** indicando la cuota inicial en mora y la cuota de corte.
 
 ## Límites y seguridad
 

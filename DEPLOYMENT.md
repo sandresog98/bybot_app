@@ -2,6 +2,8 @@
 
 Esta es la arquitectura inicial de ByBot. La API y el worker son contenedores independientes; MariaDB es externo y los archivos viven en un volumen Docker persistente compartido.
 
+> Nota: el nombre de la base de datos, el usuario y el volumen conservan el identificador heredado `node2` (esquema/infraestructura). El nombre de la **aplicación** es **ByBot**, de **ByB Jurídicos**.
+
 ```text
 Navegador → Frontend (Nginx) → API ─→ MariaDB
                                   └→ volumen `node2_files_data`

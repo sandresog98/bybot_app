@@ -31,9 +31,11 @@ backend/src/
   demanda/liquidacion.ts     # motor de liquidación y reglas (Fase 4.2)
   server.ts / worker.ts
 frontend/src/
-  layout/ (AppShell, Sidebar) pages/ (Home, Processes, ProcessDetail, Users)
-  components/ (ProcessDetail, StructuredData, LiquidacionPanel, ResultadoIA, ...)
+  layout/ (AppShell, Sidebar) pages/ (Home, ProcessesPage, ProcessDetailPage, ClientsPage, UsersPage)
+  components/ (ProcessDetail, StructuredData, LiquidacionPanel, Collapsible, Modal, ResultadoIA, ...)
 ```
+
+- Marca: **ByBot** (app) de **ByB Jurídicos**; logos en `frontend/public/` (`bybot-logo-light/dark.png`, `byb-logo.png`).
 
 ## 3. Cómo levantarlo (Windows / PowerShell)
 
@@ -61,6 +63,8 @@ npm.cmd run dev            # API :3001, worker, front :5173
 | 2 | Análisis por archivo + **consolidado por proceso** | ✅ |
 | 3 | Persistencia estructurada (Parte, Credito, Movimiento, CuotaAmortizacion, ExtraccionCampo) | ✅ |
 | — | Rediseño UI (sidebar, Inicio, acciones de archivo, "Ver", historial, solo última exitosa) | ✅ |
+| — | UI: sección **Clientes** (admin), **tema claro/oscuro**, **tabla de procesos** responsive y modales | ✅ |
+| — | Branding **ByBot / ByB Jurídicos** + **logos por tema** | ✅ |
 | 4.0 | Fundaciones (catálogo CONFIAR, parámetros, mapping producto→plantilla) | ⚠️ parcial (parámetros SMLMV y mapping ya) |
 | 4.1 | Extractores de escritura/hipoteca, mandamiento, certificado cámara de comercio | ⏳ |
 | 4.2 | Motor de liquidación y reglas (mora, capital acelerado, cuantía/competencia) | ✅ base implementada |
@@ -75,6 +79,7 @@ npm.cmd run dev            # API :3001, worker, front :5173
 - `POST /api/processes/:id/consolidate` (encola consolidación; idempotente).
 - `GET /api/processes/:id/structured` (partes, crédito, movimientos, cuotas, campos).
 - `POST /api/processes/:id/liquidacion` — body `{ cuotaInicial, cuotaCorte, interesesMora?, overridesCapital? }`.
+- `GET /api/entidades?all=1` · `POST /api/entidades` · `PATCH /api/entidades/:id` (crear/editar y activar/desactivar).
 
 ## 6. Datos de prueba cargados
 
