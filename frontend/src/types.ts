@@ -32,6 +32,8 @@ export type Process = {
   status: string;
   createdAt: string;
   entidad?: { codigo: string; nombre: string } | null;
+  deudorNombre?: string | null;
+  deudorDocumento?: string | null;
   _count?: { files: number; analyses: number };
 };
 

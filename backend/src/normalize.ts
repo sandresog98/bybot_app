@@ -172,5 +172,12 @@ export async function normalizeProcess(prisma: PrismaClient, processId: number, 
       .filter(field => field.ruta && !field.ruta.startsWith('_consolidado'))
       .map(field => fieldData(processId, analysisId, field));
     if (fieldRows.length) await tx.extraccionCampo.createMany({ data: fieldRows });
+
+    const deudorNombre = str(deudor.nombre_completo);
+    const deudorDocumento = str(deudor.numero_documento);
+    const processData: { deudorNombre?: string; deudorDocumento?: string } = {};
+    if (deudorNombre) processData.deudorNombre = deudorNombre;
+    if (deudorDocumento) processData.deudorDocumento = deudorDocumento;
+    if (Object.keys(processData).length) await tx.process.update({ where: { id: processId }, data: processData });
   });
 }

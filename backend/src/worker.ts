@@ -59,6 +59,13 @@ export async function executeNext() {
     });
     const storedResult = JSON.parse(JSON.stringify(result)) as Prisma.InputJsonValue;
     const model = usage?.model ?? analysis.model;
+    const plain = result as Record<string, unknown>;
+    const deudor = (plain.deudor && typeof plain.deudor === 'object' ? plain.deudor : {}) as Record<string, unknown>;
+    const deudorNombre = typeof deudor.nombre_completo === 'string' ? deudor.nombre_completo.trim() : '';
+    const deudorDocumento = typeof deudor.numero_documento === 'string' ? deudor.numero_documento.trim() : '';
+    const processData: Prisma.ProcessUpdateInput = { status: 'analyzed' };
+    if (deudorNombre && !analysis.process.deudorNombre) processData.deudorNombre = deudorNombre;
+    if (deudorDocumento && !analysis.process.deudorDocumento) processData.deudorDocumento = deudorDocumento;
     await prisma.$transaction([prisma.analysis.update({
       where: { id: analysis.id },
       data: {
@@ -66,7 +73,7 @@ export async function executeNext() {
         model, inputTokens: usage?.inputTokens ?? null, outputTokens: usage?.outputTokens ?? null,
         costUsd: estimateCostUsd(model ?? undefined, usage?.inputTokens, usage?.outputTokens),
       },
-    }), prisma.process.update({ where: { id: analysis.processId }, data: { status: 'analyzed' } })]);
+    }), prisma.process.update({ where: { id: analysis.processId }, data: processData })]);
   } catch (error) {
     const message = error instanceof Error && error.name === 'AbortError' ? 'El proveedor IA excedió el tiempo de espera.' : 'No se pudo completar el análisis. Reintenta más tarde.';
     const attempts = analysis.attempts;

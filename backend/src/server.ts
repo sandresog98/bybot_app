@@ -129,7 +129,19 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   app.get('/api/processes', async (request) => {
-    const user = await requireUser(request); const { page, limit } = paginationSchema.parse(request.query); const where = user.role === 'admin' ? {} : { createdBy: user.id };
+    const user = await requireUser(request); const { page, limit } = paginationSchema.parse(request.query);
+    const filters = z.object({ q: z.string().trim().max(120).optional(), entidadId: z.coerce.number().int().positive().optional(), status: z.string().trim().max(40).optional() }).parse(request.query);
+    const where: Prisma.ProcessWhereInput = user.role === 'admin' ? {} : { createdBy: user.id };
+    if (filters.entidadId) where.entidadId = filters.entidadId;
+    if (filters.status) where.status = filters.status;
+    if (filters.q) {
+      where.OR = [
+        { deudorNombre: { contains: filters.q } },
+        { deudorDocumento: { contains: filters.q } },
+        { code: { contains: filters.q } },
+        { title: { contains: filters.q } },
+      ];
+    }
     const [items, total] = await prisma.$transaction([prisma.process.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit, include: { creator: { select: { name: true } }, entidad: { select: { codigo: true, nombre: true } }, _count: { select: { files: true, analyses: true } } } }), prisma.process.count({ where })]);
     return { items, total, page, limit };
   });

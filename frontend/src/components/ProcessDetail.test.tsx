@@ -32,6 +32,11 @@ const baseProps = {
   onValidar: vi.fn().mockResolvedValue(undefined),
 };
 
+const expandFirstResult = (container: HTMLElement) => {
+  const head = container.querySelector('.collapsible-head');
+  if (head) fireEvent.click(head);
+};
+
 describe('ProcessDetail', () => {
   it('muestra placeholder cuando no hay proceso seleccionado', () => {
     render(<ProcessDetail {...baseProps} selected={null} />);
@@ -42,7 +47,7 @@ describe('ProcessDetail', () => {
     render(<ProcessDetail {...baseProps} />);
     expect(screen.getByText('extracto.pdf')).toBeInTheDocument();
     expect(screen.getByText(/2\.0 KB/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Analizar IA' }));
+    await userEvent.click(screen.getByTitle('Analizar IA'));
     expect(baseProps.onAnalyze).toHaveBeenCalledWith(7);
   });
 
@@ -55,7 +60,7 @@ describe('ProcessDetail', () => {
   it('abre la vista previa del archivo', async () => {
     const onView = vi.fn();
     render(<ProcessDetail {...baseProps} onView={onView} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Ver' }));
+    await userEvent.click(screen.getByTitle('Ver'));
     expect(onView).toHaveBeenCalledWith(7, 'extracto.pdf');
   });
 
@@ -71,9 +76,10 @@ describe('ProcessDetail', () => {
     expect(form.get('file')).toBeInstanceOf(File);
   });
 
-  it('muestra resultados de análisis con validación', () => {
-    render(<ProcessDetail {...baseProps} />);
-    expect(screen.getByText('Resumen')).toBeInTheDocument();
+  it('muestra resultados colapsables y la validación al expandir', async () => {
+    const { container } = render(<ProcessDetail {...baseProps} />);
+    expandFirstResult(container);
+    expect(await screen.findByText('Resumen')).toBeInTheDocument();
     expect(screen.getByText('ok')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Editar' })).toBeInTheDocument();
   });
@@ -84,8 +90,8 @@ describe('ProcessDetail', () => {
     render(<ProcessDetail {...baseProps} onAnalyzeAll={onAnalyzeAll} onDelete={onDelete} />);
     await userEvent.click(screen.getByRole('button', { name: 'Analizar todos los archivos IA' }));
     expect(onAnalyzeAll).toHaveBeenCalledTimes(1);
-    await userEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+    await userEvent.click(screen.getByTitle('Eliminar'));
+    await userEvent.click(screen.getByTitle('Confirmar eliminación'));
     expect(onDelete).toHaveBeenCalledWith(7);
   });
 
@@ -97,7 +103,8 @@ describe('ProcessDetail', () => {
         { id: 6, status: 'failed', fileId: 7, error: 'timeout' },
       ],
     };
-    render(<ProcessDetail {...baseProps} selected={withHistory} />);
+    const { container } = render(<ProcessDetail {...baseProps} selected={withHistory} />);
+    expandFirstResult(container);
     expect(screen.getByText('nuevo')).toBeInTheDocument();
     expect(screen.getByText(/Historial de ejecuciones \(2\)/)).toBeInTheDocument();
   });
@@ -109,13 +116,15 @@ describe('ProcessDetail', () => {
     expect(onConsolidate).toHaveBeenCalledTimes(1);
   });
 
-  it('muestra los datos estructurados del proceso', () => {
+  it('muestra los datos estructurados del proceso al expandir', async () => {
     const structured = {
       partes: [{ id: 1, rol: 'deudor', orden: 0, nombreCompleto: 'Ana Pérez', numeroDocumento: '123' }],
       credito: null, movimientos: [], cuotas: [], campos: [],
     };
-    render(<ProcessDetail {...baseProps} structured={structured} />);
-    expect(screen.getByText('Ana Pérez')).toBeInTheDocument();
+    const { container } = render(<ProcessDetail {...baseProps} structured={structured} />);
+    const head = container.querySelector('.structured-block .collapsible-head')!;
+    fireEvent.click(head);
+    expect(await screen.findByText('Ana Pérez')).toBeInTheDocument();
     expect(screen.getByText('Deudor')).toBeInTheDocument();
   });
 });

@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { Check, ChevronsDownUp, ChevronsUpDown, Eye, RefreshCw, Sparkles, Trash2, Upload, UploadCloud, X } from 'lucide-react';
 import { FILE_TIPO_LABELS } from '../types';
 import type { Detail, FileItem, Structured } from '../types';
+import { Collapsible } from './Collapsible';
 import { ResultadoIA } from './ResultadoIA';
 import { StructuredData } from './StructuredData';
 
@@ -23,6 +25,8 @@ type Props = {
   onValidar: (analysisId: number, datos: unknown) => Promise<void>;
 };
 
+const ACCEPT = '.pdf,.txt,.csv,.json,.jpg,.jpeg,.png,.webp,.tif,.tiff,.bmp,.gif,.avif';
+
 const MIME_EXT: Record<string, string> = {
   'application/pdf': 'PDF',
   'image/png': 'PNG',
@@ -41,13 +45,16 @@ const fmtUsd = (v: string | number | null | undefined) => (v == null ? null : `U
 export function ProcessDetail({ selected, structured, busyUpload, busyAnalyze, busyAnalyzeAll, busyConsolidate, onUpload, onAnalyze, onAnalyzeAll, onConsolidate, onDelete, onReplace, onView, onDownload, onValidar }: Props) {
   const [confirmId, setConfirmId] = useState<number | null>(null);
   const [selectedRun, setSelectedRun] = useState<Record<string, number>>({});
+  const [uploadName, setUploadName] = useState('');
+  const [openResults, setOpenResults] = useState<Record<string, boolean>>({});
+  const [structuredOpen, setStructuredOpen] = useState(false);
 
   const handleUpload = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
     const tipo = String(form.get('tipo') ?? '').trim() || undefined;
-    void onUpload(form, tipo).then(() => formEl.reset());
+    void onUpload(form, tipo).then(() => { formEl.reset(); setUploadName(''); });
   };
 
   const handleReplace = (file: FileItem, fileList: FileList | null) => {
@@ -73,30 +80,55 @@ export function ProcessDetail({ selected, structured, busyUpload, busyAnalyze, b
 
   if (!selected) return <article><p className="placeholder">Selecciona o crea un proceso.</p></article>;
 
+  const allOpen = groups.length > 0 && groups.every(group => openResults[group.key]);
+
   return (
     <article>
       <h2>{selected.title}</h2>
       <p className="hint">
         {selected.code} · <span className="status" data-status={selected.status}>{selected.status}</span>
         {selected.entidad && <> · Cliente: <strong>{selected.entidad.nombre}</strong></>}
+        {selected.deudorNombre && <> · Deudor: <strong>{selected.deudorNombre}</strong>{selected.deudorDocumento ? ` (${selected.deudorDocumento})` : ''}</>}
       </p>
+
+      <section className="upload-card">
+        <div className="section-head">
+          <h3>Subir archivo</h3>
+        </div>
+        <form onSubmit={handleUpload} className="upload-form">
+          <label className="dropzone">
+            <UploadCloud size={22} aria-hidden />
+            <span className="dropzone-hint">Haz clic o arrastra un archivo aquí</span>
+            <span className="dropzone-name">{uploadName || 'Ningún archivo seleccionado'}</span>
+            <input
+              name="file"
+              type="file"
+              accept={ACCEPT}
+              required
+              onChange={event => setUploadName(event.target.files?.[0]?.name ?? '')}
+            />
+          </label>
+          <div className="upload-controls">
+            <select name="tipo" defaultValue="otro" aria-label="Tipo de archivo">
+              {Object.entries(FILE_TIPO_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+            <button type="submit" disabled={busyUpload}>
+              <Upload size={16} aria-hidden />
+              {busyUpload ? 'Subiendo…' : 'Subir'}
+            </button>
+          </div>
+        </form>
+      </section>
 
       <div className="section-head">
         <h3>Archivos</h3>
         <button type="button" className="btn-small" disabled={busyAnalyzeAll || selected.files.length === 0} onClick={() => void onAnalyzeAll()}>
+          <Sparkles size={16} aria-hidden />
           {busyAnalyzeAll ? 'Analizando…' : 'Analizar todos los archivos IA'}
         </button>
       </div>
 
-      <form onSubmit={handleUpload} className="inline">
-        <input name="file" type="file" accept=".pdf,.txt,.csv,.json,.jpg,.jpeg,.png,.webp,.tif,.tiff,.bmp,.gif,.avif" required />
-        <select name="tipo" defaultValue="otro">
-          {Object.entries(FILE_TIPO_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
-        <button type="submit" disabled={busyUpload}>{busyUpload ? 'Subiendo…' : 'Subir'}</button>
-      </form>
-
-      <ul>
+      <ul className="file-list">
         {selected.files.length === 0 && <p className="placeholder">Este proceso aún no tiene archivos.</p>}
         {selected.files.map(file => {
           const analysis = latestByFile.get(file.id);
@@ -104,10 +136,10 @@ export function ProcessDetail({ selected, structured, busyUpload, busyAnalyze, b
             <li key={file.id} className="file-item">
               <button className="file-name" onClick={() => onDownload(file.id, file.originalName)} title="Descargar">
                 <span className="ico">{extOfMime(file.mimeType)}</span>
-                <span>{file.originalName}</span>
+                <span className="file-label">{file.originalName}</span>
               </button>
-              <span className="file-size">
-                {file.tipo ? FILE_TIPO_LABELS[file.tipo] ?? file.tipo : ''} · {(file.sizeBytes / 1024).toFixed(1)} KB
+              <span className="file-meta">
+                <span>{file.tipo ? FILE_TIPO_LABELS[file.tipo] ?? file.tipo : ''} · {(file.sizeBytes / 1024).toFixed(1)} KB</span>
                 {file.converted && (
                   <span className="consumo-chip" title={`Almacenado como ${file.mimeType}; original ${file.originalMimeType ?? 'desconocido'}`}>
                     {extOfMime(file.originalMimeType)} → {extOfMime(file.mimeType)}
@@ -116,21 +148,29 @@ export function ProcessDetail({ selected, structured, busyUpload, busyAnalyze, b
                 {analysis && <span className="status" data-status={analysis.status}>{analysis.status}</span>}
               </span>
               <span className="file-actions">
-                <button className="btn-small btn-ghost" onClick={() => onView(file.id, file.originalName)}>Ver</button>
-                <button className="btn-small" disabled={busyAnalyze} onClick={() => void onAnalyze(file.id)}>
-                  {busyAnalyze ? 'Analizando…' : 'Analizar IA'}
+                <button type="button" className="icon-btn" title="Ver" onClick={() => onView(file.id, file.originalName)}>
+                  <Eye size={16} aria-hidden />
                 </button>
-                <label className="btn-small btn-ghost file-replace">
-                  Recargar
-                  <input type="file" hidden accept=".pdf,.txt,.csv,.json,.jpg,.jpeg,.png,.webp,.tif,.tiff,.bmp,.gif,.avif" onChange={event => { handleReplace(file, event.target.files); event.target.value = ''; }} />
+                <button type="button" className="icon-btn primary" title="Analizar IA" disabled={busyAnalyze} onClick={() => void onAnalyze(file.id)}>
+                  <Sparkles size={16} aria-hidden />
+                </button>
+                <label className="icon-btn" title="Recargar (reemplazar)">
+                  <RefreshCw size={16} aria-hidden />
+                  <input type="file" hidden accept={ACCEPT} onChange={event => { handleReplace(file, event.target.files); event.target.value = ''; }} />
                 </label>
                 {confirmId === file.id ? (
-                  <>
-                    <button className="btn-small btn-danger" onClick={() => { setConfirmId(null); void onDelete(file.id); }}>Confirmar</button>
-                    <button className="btn-small btn-ghost" onClick={() => setConfirmId(null)}>Cancelar</button>
-                  </>
+                  <span className="confirm-group">
+                    <button type="button" className="icon-btn danger" title="Confirmar eliminación" onClick={() => { setConfirmId(null); void onDelete(file.id); }}>
+                      <Check size={16} aria-hidden />
+                    </button>
+                    <button type="button" className="icon-btn" title="Cancelar" onClick={() => setConfirmId(null)}>
+                      <X size={16} aria-hidden />
+                    </button>
+                  </span>
                 ) : (
-                  <button className="btn-small btn-ghost" onClick={() => setConfirmId(file.id)}>Eliminar</button>
+                  <button type="button" className="icon-btn danger" title="Eliminar" onClick={() => setConfirmId(file.id)}>
+                    <Trash2 size={16} aria-hidden />
+                  </button>
                 )}
               </span>
             </li>
@@ -140,10 +180,18 @@ export function ProcessDetail({ selected, structured, busyUpload, busyAnalyze, b
 
       <div className="section-head">
         <h3>Resultados</h3>
-        <button type="button" className="btn-small" disabled={busyConsolidate || selected.analyses.length === 0} onClick={() => void onConsolidate()}>
-          {busyConsolidate ? 'Consolidando…' : 'Consolidar análisis del proceso'}
-        </button>
+        <div className="toolbar">
+          {groups.length > 0 && (
+            <button type="button" className="icon-btn" title={allOpen ? 'Contraer todo' : 'Expandir todo'} onClick={() => setOpenResults(allOpen ? {} : Object.fromEntries(groups.map(group => [group.key, true])))}>
+              {allOpen ? <ChevronsDownUp size={16} aria-hidden /> : <ChevronsUpDown size={16} aria-hidden />}
+            </button>
+          )}
+          <button type="button" className="btn-small" disabled={busyConsolidate || selected.analyses.length === 0} onClick={() => void onConsolidate()}>
+            {busyConsolidate ? 'Consolidando…' : 'Consolidar análisis del proceso'}
+          </button>
+        </div>
       </div>
+
       {selected.analyses.length === 0
         ? <p className="placeholder">Aún no hay análisis en este proceso.</p>
         : groups.map(({ key, runs, primary }) => {
@@ -151,17 +199,24 @@ export function ProcessDetail({ selected, structured, busyUpload, busyAnalyze, b
           const file = key === 'process' ? null : selected.files.find(item => String(item.id) === key);
           const title = file ? file.originalName : 'Análisis del proceso';
           return (
-            <section key={key} className="result-block">
-              <div className="result-head">
-                <strong className="result-title">{title}</strong>
-                <span className="status" data-status={chosen.status}>{chosen.status}</span>
-                {chosen.model && <span className="consumo-chip">{chosen.model}</span>}
-                {(chosen.inputTokens != null || chosen.outputTokens != null) && (
-                  <span className="consumo-chip">tok {chosen.inputTokens ?? 0} / {chosen.outputTokens ?? 0}</span>
-                )}
-                {fmtUsd(chosen.costUsd) && <span className="consumo-chip">{fmtUsd(chosen.costUsd)}</span>}
-                {runs.length > 1 && <span className="consumo-chip">{runs.length} ejecuciones</span>}
-              </div>
+            <Collapsible
+              key={key}
+              className="result-block"
+              open={Boolean(openResults[key])}
+              onToggle={() => setOpenResults(state => ({ ...state, [key]: !state[key] }))}
+              title={title}
+              subtitle={(
+                <>
+                  <span className="status" data-status={chosen.status}>{chosen.status}</span>
+                  {chosen.model && <span className="consumo-chip">{chosen.model}</span>}
+                  {(chosen.inputTokens != null || chosen.outputTokens != null) && (
+                    <span className="consumo-chip">tok {chosen.inputTokens ?? 0} / {chosen.outputTokens ?? 0}</span>
+                  )}
+                  {fmtUsd(chosen.costUsd) && <span className="consumo-chip">{fmtUsd(chosen.costUsd)}</span>}
+                  {runs.length > 1 && <span className="consumo-chip">{runs.length} ejecuciones</span>}
+                </>
+              )}
+            >
               {chosen.status === 'completed'
                 ? <ResultadoIA data={chosen.validated ?? chosen.result ?? {}} onSave={datos => onValidar(chosen.id, datos)} />
                 : <p className="notice">{chosen.error ?? `Estado: ${chosen.status}`}</p>}
@@ -186,12 +241,18 @@ export function ProcessDetail({ selected, structured, busyUpload, busyAnalyze, b
                   </ul>
                 </details>
               )}
-            </section>
+            </Collapsible>
           );
         })}
 
-      <div className="section-head"><h3>Datos estructurados</h3></div>
-      <StructuredData data={structured} />
+      <Collapsible
+        className="structured-block"
+        open={structuredOpen}
+        onToggle={() => setStructuredOpen(state => !state)}
+        title="Datos estructurados"
+      >
+        <StructuredData data={structured} />
+      </Collapsible>
     </article>
   );
 }

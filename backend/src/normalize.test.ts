@@ -12,6 +12,7 @@ function fakePrisma() {
     extraccionCampo: { deleteMany: vi.fn(), createMany: vi.fn(async ({ data: data_ }: { data: Array<Record<string, unknown>> }) => { calls.campo = data_; }) },
     parte: { deleteMany: vi.fn(), createMany: vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => { calls.parte = data; }) },
     credito: { deleteMany: vi.fn(), create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => { calls.credito = data; return { id: 99 }; }) },
+    process: { update: vi.fn(async () => ({})) },
   };
   const prisma = { $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx)) };
   return { prisma: prisma as unknown as PrismaClient, calls };

@@ -23,7 +23,14 @@ export const api = {
     }),
   logout: () => request<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
 
-  listProcesses: () => request<{ items: Process[] }>('/processes'),
+  listProcesses: (filters: { q?: string; entidadId?: number; status?: string } = {}) => {
+    const params = new URLSearchParams();
+    if (filters.q) params.set('q', filters.q);
+    if (filters.entidadId) params.set('entidadId', String(filters.entidadId));
+    if (filters.status) params.set('status', filters.status);
+    const query = params.toString();
+    return request<{ items: Process[] }>(`/processes${query ? `?${query}` : ''}`);
+  },
   getProcess: (id: number) => request<Detail>(`/processes/${id}`),
   getStructured: (id: number) => request<Structured>(`/processes/${id}/structured`),
   liquidar: (id: number, payload: { cuotaInicial: number; cuotaCorte: number; interesesMora?: number; overridesCapital?: Record<string, number> }) =>

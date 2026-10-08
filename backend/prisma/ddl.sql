@@ -29,9 +29,11 @@ CREATE TABLE IF NOT EXISTS `Process` (
   status VARCHAR(40) NOT NULL DEFAULT 'created',
   entidadId INT NULL,
   createdBy INT NOT NULL,
+  deudorNombre VARCHAR(200) NULL,
+  deudorDocumento VARCHAR(60) NULL,
   createdAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updatedAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  PRIMARY KEY (id), UNIQUE KEY process_code_key (code),
+  PRIMARY KEY (id), UNIQUE KEY process_code_key (code), KEY process_deudor_documento_idx (deudorDocumento),
   CONSTRAINT process_created_by_fkey FOREIGN KEY (createdBy) REFERENCES `User` (id),
   CONSTRAINT process_entidad_id_fkey FOREIGN KEY (entidadId) REFERENCES `Entidad` (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -95,6 +97,9 @@ CREATE TABLE IF NOT EXISTS `AuditEvent` (
 
 -- Migraciones idempotentes de columnas añadidas después de la creación inicial.
 ALTER TABLE `Analysis` ADD COLUMN IF NOT EXISTS scope VARCHAR(20) NOT NULL DEFAULT 'file';
+ALTER TABLE `Process` ADD COLUMN IF NOT EXISTS deudorNombre VARCHAR(200) NULL;
+ALTER TABLE `Process` ADD COLUMN IF NOT EXISTS deudorDocumento VARCHAR(60) NULL;
+ALTER TABLE `Process` ADD INDEX IF NOT EXISTS process_deudor_documento_idx (deudorDocumento);
 
 -- ---------- Fase 3: persistencia estructurada ----------
 CREATE TABLE IF NOT EXISTS `Parte` (

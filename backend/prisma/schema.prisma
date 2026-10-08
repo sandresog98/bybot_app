@@ -37,6 +37,8 @@ model Process {
   status    String    @default("created")
   entidadId Int?
   createdBy Int
+  deudorNombre    String?
+  deudorDocumento String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   creator   User      @relation("CreatedProcesses", fields: [createdBy], references: [id])
@@ -48,6 +50,8 @@ model Process {
   movimientos Movimiento[]
   cuotas    CuotaAmortizacion[]
   campos    ExtraccionCampo[]
+
+  @@index([deudorDocumento])
 }
 
 model File {
